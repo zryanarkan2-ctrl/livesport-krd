@@ -1,7 +1,7 @@
 import type { Match, MatchStatus } from '@/types';
 
 const API_KEY = 'de11f00e343eaef017411a3540759b47';
-const BASE_URL = 'https://api-sports.io';
+const BASE_URL = 'https://' + 'v3.football.' + 'api-sports.io';
 
 export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; logo: string }> = {
   2: {
