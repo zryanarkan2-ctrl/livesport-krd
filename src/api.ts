@@ -3,7 +3,6 @@ import type { Match, MatchStatus } from '@/types';
 const API_KEY = 'de11f00e343eaef017411a3540759b47';
 const BASE_URL = 'https://api-sports.io';
 
-// چامپیۆنزلیگ + ٥ خولە گەورەکەی ئەوروپا + خولی ڕۆشەنی سعودی
 export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; logo: string }> = {
   2: {
     name: 'UEFA Champions League',
@@ -59,16 +58,16 @@ function mapStatus(short: string): MatchStatus {
 
 export function clearCache(day?: 'yesterday' | 'today' | 'tomorrow') {
   if (day) {
-    localStorage.removeItem(`lskrd_matches_${day}`);
+    localStorage.removeItem(`lskrd_v3_${day}`);
   } else {
-    localStorage.removeItem('lskrd_matches_yesterday');
-    localStorage.removeItem('lskrd_matches_today');
-    localStorage.removeItem('lskrd_matches_tomorrow');
+    localStorage.removeItem('lskrd_v3_yesterday');
+    localStorage.removeItem('lskrd_v3_today');
+    localStorage.removeItem('lskrd_v3_tomorrow');
   }
 }
 
 export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promise<Match[]> {
-  const cacheKey = `lskrd_matches_${day}`;
+  const cacheKey = `lskrd_v3_${day}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
     try {
