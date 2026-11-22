@@ -1,67 +1,53 @@
-import { Radio } from 'lucide-react';
-import type { DayKey } from '@/lib/espn-types';
+import { Calendar, RefreshCw } from 'lucide-react';
 
 interface Props {
-  value: DayKey;
-  onChange: (day: DayKey) => void;
-  liveCount?: number;
+  active: 'yesterday' | 'today' | 'tomorrow';
+  onChange: (day: 'yesterday' | 'today' | 'tomorrow') => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
-const TABS: Array<{ key: DayKey; label: string }> = [
-  { key: 'live', label: 'ڕاستەوخۆ' },
-  { key: 'yesterday', label: 'دوێنێ' },
-  { key: 'today', label: 'ئەمڕۆ' },
-  { key: 'tomorrow', label: 'سبەی' },
+const tabs = [
+  { id: 'yesterday' as const, label: 'دوێنێ' },
+  { id: 'today' as const, label: 'ئەمڕۆ' },
+  { id: 'tomorrow' as const, label: 'سبەی' },
 ];
 
-/** تابەکانی ڕۆژ + هەڵبژاردنی بەروار (calendar) */
-export function DayTabs({ value, onChange, liveCount = 0 }: Props) {
-  const isCustom = /^\d{8}$/.test(value);
-  const dateInputValue = isCustom ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}` : '';
-
+export function DayTabs({ active, onChange, onRefresh, refreshing }: Props) {
   return (
-    <div dir="rtl" className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-1 gap-1 rounded-xl border border-slate-800 bg-slate-900/60 p-1">
-        {TABS.map((t) => {
-          const active = value === t.key;
+    <div className="mb-5 flex items-center gap-3">
+      <div className="flex flex-1 items-center gap-1 rounded-xl border border-white/[0.06] bg-slate-800/40 p-1">
+        <div className="mr-1 flex items-center gap-1.5 px-2 text-gray-500">
+          <Calendar className="h-4 w-4" />
+        </div>
+        {tabs.map((tab) => {
+          const isActive = active === tab.id;
           return (
             <button
-              key={t.key}
-              type="button"
-              onClick={() => onChange(t.key)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                active ? 'bg-emerald-500 text-white shadow' : 'text-slate-300 hover:bg-slate-800'
+              key={tab.id}
+              onClick={() => onChange(tab.id)}
+              className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition-all ${
+                isActive
+                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-              {t.key === 'live' && <Radio className="h-4 w-4" />}
-              {t.label}
-              {t.key === 'live' && liveCount > 0 && (
-                <span className="rounded-full bg-red-500 px-1.5 text-xs leading-5 text-white">{liveCount}</span>
-              )}
+              {tab.label}
             </button>
           );
         })}
       </div>
-
-      <label
-        className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-          isCustom
-            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300'
-            : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
-        }`}
-      >
-        <span>{isCustom ? dateInputValue.replace(/-/g, '/') : 'بەروار'}</span>
-        <input
-          type="date"
-          value={dateInputValue}
-          onChange={(e) => {
-            const v = e.target.value.replace(/-/g, '');
-            if (/^\d{8}$/.test(v)) onChange(v);
-          }}
-          className="w-0 opacity-0 [color-scheme:dark] focus:w-auto focus:opacity-100"
-          aria-label="هەڵبژاردنی بەروار"
-        />
-      </label>
+      {onRefresh && (
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-slate-800/40 px-3 py-2.5 text-xs font-semibold text-gray-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50"
+          title="نوێکردنەوەی ئەنجامەکان"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">نوێکردنەوەی ئەنجامەکان</span>
+        </button>
+      )}
     </div>
   );
 }
