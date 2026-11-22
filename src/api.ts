@@ -47,7 +47,7 @@ function getDateString(day: 'yesterday' | 'today' | 'tomorrow'): string {
   const localTime = new Date(now.getTime() + (baghdadOffset + now.getTimezoneOffset()) * 60000);
   if (day === 'yesterday') localTime.setDate(localTime.getDate() - 1);
   if (day === 'tomorrow') localTime.setDate(localTime.getDate() + 1);
-  return localTime.toISOString().split('T');
+  return localTime.toISOString().slice(0, 10);
 }
 
 function mapStatus(short: string): MatchStatus {
@@ -146,7 +146,7 @@ export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promi
 }
 
 export function groupByLeague(matches: Match[]) {
-  const order =;
+  const order = [2, 39, 140, 135, 78, 61, 307];
   const map = new Map<
     number,
     {
