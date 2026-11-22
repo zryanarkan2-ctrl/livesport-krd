@@ -1,142 +1,165 @@
-import type { ApiMatch, Match, MatchStatus } from './types';
+import type { Match, MatchStatus } from '@/types';
 
-const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/matches`;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const CACHE_TTL = 10 * 60 * 1000;
-const CACHE_PREFIX = 'lskrd_matches_';
+const API_KEY = 'de11f00e343eaef017411a3540759b47';
+const BASE_URL = 'https://api-sports.io';
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+// چامپیۆنزلیگ + ٥ خولە گەورەکەی ئەوروپا + خولی ڕۆشەنی سعودی
+export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; logo: string }> = {
+  2: {
+    name: 'UEFA Champions League',
+    country: 'ئەوروپا',
+    logo: 'https://api-sports.io',
+  },
+  39: {
+    name: 'Premier League',
+    country: 'ئینگلتەرا',
+    logo: 'https://api-sports.io',
+  },
+  140: {
+    name: 'La Liga',
+    country: 'ئیسپانیا',
+    logo: 'https://api-sports.io',
+  },
+  135: {
+    name: 'Serie A',
+    country: 'ئیتاڵیا',
+    logo: 'https://api-sports.io',
+  },
+  78: {
+    name: 'Bundesliga',
+    country: 'ئەڵمانیا',
+    logo: 'https://api-sports.io',
+  },
+  61: {
+    name: 'Ligue 1',
+    country: 'فەڕەنسا',
+    logo: 'https://api-sports.io',
+  },
+  307: {
+    name: 'Saudi Pro League',
+    country: 'سعودیە',
+    logo: 'https://api-sports.io',
+  },
+};
+
+function getDateString(day: 'yesterday' | 'today' | 'tomorrow'): string {
+  const now = new Date();
+  const baghdadOffset = 3 * 60;
+  const localTime = new Date(now.getTime() + (baghdadOffset + now.getTimezoneOffset()) * 60000);
+  if (day === 'yesterday') localTime.setDate(localTime.getDate() - 1);
+  if (day === 'tomorrow') localTime.setDate(localTime.getDate() + 1);
+  return localTime.toISOString().split('T');
 }
 
-function shiftDate(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-const LIVE_CODES = new Set(['1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'LIVE']);
-const FINISHED_CODES = new Set(['FT', 'AET', 'PEN', 'WO', 'LU']);
-
-function deriveStatus(short: string): MatchStatus {
-  if (LIVE_CODES.has(short)) return 'live';
-  if (FINISHED_CODES.has(short)) return 'finished';
+function mapStatus(short: string): MatchStatus {
+  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'].includes(short)) return 'live';
+  if (['FT', 'AET', 'PEN'].includes(short)) return 'finished';
   return 'upcoming';
 }
 
-function cacheKey(day: string): string {
-  return `${CACHE_PREFIX}${day}`;
-}
-
-function readCache(day: string): ApiMatch[] | null {
-  try {
-    const raw = localStorage.getItem(cacheKey(day));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.ts || Date.now() - parsed.ts > CACHE_TTL) return null;
-    return parsed.data as ApiMatch[];
-  } catch {
-    return null;
+export function clearCache(day?: 'yesterday' | 'today' | 'tomorrow') {
+  if (day) {
+    localStorage.removeItem(`lskrd_matches_${day}`);
+  } else {
+    localStorage.removeItem('lskrd_matches_yesterday');
+    localStorage.removeItem('lskrd_matches_today');
+    localStorage.removeItem('lskrd_matches_tomorrow');
   }
 }
 
-function writeCache(day: string, data: ApiMatch[]): void {
-  try {
-    localStorage.setItem(cacheKey(day), JSON.stringify({ ts: Date.now(), data }));
-  } catch {
-    // ignore
+export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promise<Match[]> {
+  const cacheKey = `lskrd_matches_${day}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.timestamp < 10 * 60 * 1000) {
+        return parsed.data;
+      }
+    } catch {
+      localStorage.removeItem(cacheKey);
+    }
   }
-}
 
-export function clearCache(day: string): void {
-  try {
-    localStorage.removeItem(cacheKey(day));
-  } catch {
-    // ignore
-  }
-}
-
-async function fetchDay(date: string): Promise<ApiMatch[]> {
-  const url = `${EDGE_URL}?date=${date}&timezone=Asia/Baghdad`;
-  const resp = await fetch(url, {
+  const dateStr = getDateString(day);
+  const res = await fetch(`${BASE_URL}/fixtures?date=${dateStr}&timezone=Asia/Baghdad`, {
     headers: {
-      Authorization: `Bearer ${ANON_KEY}`,
-      'Content-Type': 'application/json',
+      'x-apisports-key': API_KEY,
     },
   });
-  if (!resp.ok) {
-    throw new Error(`هەڵە لە وەرگرتنی داتا (${resp.status})`);
-  }
-  const json = await resp.json();
-  if (json.error) {
-    throw new Error(json.error);
-  }
-  if (!Array.isArray(json.response)) {
-    throw new Error('وەڵامی داتا نادروستە');
-  }
-  return json.response as ApiMatch[];
-}
 
-export async function getMatches(
-  day: 'yesterday' | 'today' | 'tomorrow',
-): Promise<Match[]> {
-  const date =
-    day === 'yesterday'
-      ? shiftDate(-1)
-      : day === 'tomorrow'
-        ? shiftDate(1)
-        : todayISO();
-
-  let apiMatches = readCache(day);
-  if (!apiMatches) {
-    apiMatches = await fetchDay(date);
-    writeCache(day, apiMatches);
+  if (!res.ok) {
+    throw new Error('نەتوانرا زانیاری یارییەکان بهێنرێت');
   }
 
-  return apiMatches.map((m) => ({
-    id: m.id,
-    home: m.home,
-    away: m.away,
-    league: m.league,
-    leagueId: m.leagueId,
-    leagueLogo: m.leagueLogo,
-    country: m.country,
-    flag: m.flag,
-    stadium: m.stadium,
-    kickoff: m.kickoff,
-    statusShort: m.statusShort,
-    status: deriveStatus(m.statusShort),
-    minute: m.minute,
-    scoreHome: m.scoreHome,
-    scoreAway: m.scoreAway,
-    day,
-  }));
-}
+  const json = await res.json();
+  const rawFixtures = json.response || [];
 
-export function formatKickoff(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
+  const filtered: Match[] = rawFixtures
+    .filter((item: any) => Boolean(ALLOWED_LEAGUES[item.league?.id]))
+    .map((item: any) => {
+      const leagueId = item.league.id;
+      const leagueInfo = ALLOWED_LEAGUES[leagueId];
+      const kickoffDate = new Date(item.fixture.date);
+      const kickoff = kickoffDate.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Baghdad',
+      });
+
+      return {
+        id: String(item.fixture.id),
+        home: {
+          id: item.teams.home.id,
+          name: item.teams.home.name,
+          logo: item.teams.home.logo,
+        },
+        away: {
+          id: item.teams.away.id,
+          name: item.teams.away.name,
+          logo: item.teams.away.logo,
+        },
+        league: leagueInfo.name,
+        leagueId: leagueId,
+        leagueLogo: leagueInfo.logo,
+        country: leagueInfo.country,
+        flag: item.league.flag || null,
+        stadium: item.fixture.venue?.name || '',
+        kickoff,
+        statusShort: item.fixture.status.short,
+        status: mapStatus(item.fixture.status.short),
+        minute: item.fixture.status.elapsed,
+        scoreHome: item.goals.home,
+        scoreAway: item.goals.away,
+        day,
+      };
     });
-  } catch {
-    return '--:--';
-  }
+
+  localStorage.setItem(
+    cacheKey,
+    JSON.stringify({
+      timestamp: Date.now(),
+      data: filtered,
+    }),
+  );
+
+  return filtered;
 }
 
-export interface LeagueGroup {
-  leagueId: number;
-  league: string;
-  leagueLogo: string;
-  country: string;
-  flag: string | null;
-  matches: Match[];
-}
+export function groupByLeague(matches: Match[]) {
+  const order =;
+  const map = new Map<
+    number,
+    {
+      leagueId: number;
+      league: string;
+      leagueLogo: string;
+      country: string;
+      flag: string | null;
+      matches: Match[];
+    }
+  >();
 
-export function groupByLeague(matches: Match[]): LeagueGroup[] {
-  const map = new Map<number, LeagueGroup>();
   for (const m of matches) {
     if (!map.has(m.leagueId)) {
       map.set(m.leagueId, {
@@ -150,5 +173,8 @@ export function groupByLeague(matches: Match[]): LeagueGroup[] {
     }
     map.get(m.leagueId)!.matches.push(m);
   }
-  return Array.from(map.values());
+
+  return Array.from(map.values()).sort(
+    (a, b) => order.indexOf(a.leagueId) - order.indexOf(b.leagueId),
+  );
 }
