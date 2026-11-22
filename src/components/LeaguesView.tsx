@@ -1,48 +1,15 @@
 import { Trophy } from 'lucide-react';
 
+const IMG_BASE = 'https://' + 'media.api-sports.io' + '/football/leagues/';
+
 const LEAGUES = [
-  {
-    id: 2,
-    name: 'UEFA Champions League',
-    country: 'ئەوروپا',
-    logo: 'https://api-sports.io',
-  },
-  {
-    id: 39,
-    name: 'Premier League',
-    country: 'ئینگلتەرا',
-    logo: 'https://api-sports.io',
-  },
-  {
-    id: 140,
-    name: 'La Liga',
-    country: 'ئیسپانیا',
-    logo: 'https://api-sports.io',
-  },
-  {
-    id: 135,
-    name: 'Serie A',
-    country: 'ئیتاڵیا',
-    logo: 'https://api-sports.io',
-  },
-  {
-    id: 78,
-    name: 'Bundesliga',
-    country: 'ئەڵمانیا',
-    logo: 'https://api-sports.io',
-  },
-  {
-    id: 61,
-    name: 'Ligue 1',
-    country: 'فەڕەنسا',
-    logo: 'https://api-sports.io',
-  },
-  {
-    id: 307,
-    name: 'Saudi Pro League',
-    country: 'سعودیە',
-    logo: 'https://api-sports.io',
-  },
+  { id: 2, name: 'UEFA Champions League', country: 'ئەوروپا' },
+  { id: 39, name: 'Premier League', country: 'ئینگلتەرا' },
+  { id: 140, name: 'La Liga', country: 'ئیسپانیا' },
+  { id: 135, name: 'Serie A', country: 'ئیتاڵیا' },
+  { id: 78, name: 'Bundesliga', country: 'ئەڵمانیا' },
+  { id: 61, name: 'Ligue 1', country: 'فەڕەنسا' },
+  { id: 307, name: 'Saudi Pro League', country: 'سعودیە' },
 ];
 
 export function LeaguesView() {
@@ -70,7 +37,7 @@ export function LeaguesView() {
             </div>
             <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/95 p-2">
               <img
-                src={league.logo}
+                src={`${IMG_BASE}${league.id}.png`}
                 alt={league.name}
                 className="h-10 w-10 object-contain"
               />
