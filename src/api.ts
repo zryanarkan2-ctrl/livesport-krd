@@ -1,6 +1,6 @@
 import type { Match, MatchStatus } from '@/types';
 
-const ESPN_BASE = 'https://' + '://espn.com' + '/apis/site/v2/sports/soccer/';
+const ESPN_BASE = 'https://' + 'site.api.' + 'espn.com' + '/apis/site/v2/sports/soccer/';
 const LEAGUES_CONFIG = [
   { id: 2, slug: 'uefa.champions', name: 'UEFA Champions League', country: 'ئەوروپا' },
   { id: 39, slug: 'eng.1', name: 'Premier League', country: 'ئینگلتەرا' },
