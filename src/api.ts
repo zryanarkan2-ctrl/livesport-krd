@@ -1,7 +1,7 @@
 import type { Match, MatchStatus } from '@/types';
 
 const API_KEY = 'de11f00e343eaef017411a3540759b47';
-const BASE_URL = 'https://api-sports.io';
+const BASE_URL = 'https://v3.football.api-sports.io';
 
 export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; logo: string }> = {
   2: {
@@ -146,7 +146,7 @@ export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promi
 }
 
 export function groupByLeague(matches: Match[]) {
-  const order = [2, 39, 140, 135, 78, 61, 307];
+  const order =;
   const map = new Map<
     number,
     {
@@ -177,6 +177,7 @@ export function groupByLeague(matches: Match[]) {
     (a, b) => order.indexOf(a.leagueId) - order.indexOf(b.leagueId),
   );
 }
+
 export function formatKickoff(kickoff: string): string {
   return kickoff;
 }
