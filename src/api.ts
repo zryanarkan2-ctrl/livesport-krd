@@ -1,6 +1,8 @@
 import type { Match, MatchStatus } from '@/types';
 
 const ESPN_BASE = 'https://' + 'site.api.' + 'espn.com' + '/apis/site/v2/sports/soccer/';
+const LEAGUE_IMG_BASE = 'https://media.api-sports.io/football/leagues/';
+
 const LEAGUES_CONFIG = [
   { id: 2, slug: 'uefa.champions', name: 'UEFA Champions League', country: 'ئەوروپا' },
   { id: 39, slug: 'eng.1', name: 'Premier League', country: 'ئینگلتەرا' },
@@ -22,12 +24,11 @@ const LEAGUE_ORDER: Record<number, number> = {
 };
 
 function getEspnDate(day: 'yesterday' | 'today' | 'tomorrow'): string {
-  const now = new Date();
-  const baghdadOffset = 3 * 60;
-  const localTime = new Date(now.getTime() + (baghdadOffset + now.getTimezoneOffset()) * 60000);
-  if (day === 'yesterday') localTime.setDate(localTime.getDate() - 1);
-  if (day === 'tomorrow') localTime.setDate(localTime.getDate() + 1);
-  return localTime.toISOString().slice(0, 10).replace(/-/g, '');
+  // کاتی بەغدا (UTC+3)
+  const d = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  if (day === 'yesterday') d.setUTCDate(d.getUTCDate() - 1);
+  if (day === 'tomorrow') d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
 }
 
 export function clearCache(day?: 'yesterday' | 'today' | 'tomorrow') {
@@ -114,19 +115,26 @@ export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promi
             day,
           });
         }
-      } catch {
-        // Ignore single league fetch failure
+      } catch (err) {
+        console.error(`Failed to load ${lg.name}:`, err);
       }
     }),
   );
 
-  localStorage.setItem(
-    cacheKey,
-    JSON.stringify({
-      timestamp: Date.now(),
-      data: allMatches,
-    }),
-  );
+  // لیستی بەتاڵ کاش مەکە
+  if (allMatches.length > 0) {
+    try {
+      localStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          timestamp: Date.now(),
+          data: allMatches,
+        }),
+      );
+    } catch {
+      // ئەگەر localStorage پڕ بوو یان بەردەست نەبوو
+    }
+  }
 
   return allMatches;
 }
