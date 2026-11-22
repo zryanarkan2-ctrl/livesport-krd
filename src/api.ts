@@ -1,7 +1,7 @@
 import type { Match, MatchStatus } from '@/types';
 
 const API_KEY = 'de11f00e343eaef017411a3540759b47';
-const BASE_URL = 'https://v3.football.api-sports.io';
+const BASE_URL = 'https://api-sports.io';
 
 export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; logo: string }> = {
   2: {
@@ -41,6 +41,16 @@ export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; lo
   },
 };
 
+const LEAGUE_ORDER: Record<number, number> = {
+  2: 1,
+  39: 2,
+  140: 3,
+  135: 4,
+  78: 5,
+  61: 6,
+  307: 7,
+};
+
 function getDateString(day: 'yesterday' | 'today' | 'tomorrow'): string {
   const now = new Date();
   const baghdadOffset = 3 * 60;
@@ -51,23 +61,23 @@ function getDateString(day: 'yesterday' | 'today' | 'tomorrow'): string {
 }
 
 function mapStatus(short: string): MatchStatus {
-  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'].includes(short)) return 'live';
-  if (['FT', 'AET', 'PEN'].includes(short)) return 'finished';
+  if ('1H,HT,2H,ET,BT,P,SUSP,INT,LIVE'.split(',').includes(short)) return 'live';
+  if ('FT,AET,PEN'.split(',').includes(short)) return 'finished';
   return 'upcoming';
 }
 
 export function clearCache(day?: 'yesterday' | 'today' | 'tomorrow') {
   if (day) {
-    localStorage.removeItem(`lskrd_v3_${day}`);
+    localStorage.removeItem(`lskrd_v4_${day}`);
   } else {
-    localStorage.removeItem('lskrd_v3_yesterday');
-    localStorage.removeItem('lskrd_v3_today');
-    localStorage.removeItem('lskrd_v3_tomorrow');
+    localStorage.removeItem('lskrd_v4_yesterday');
+    localStorage.removeItem('lskrd_v4_today');
+    localStorage.removeItem('lskrd_v4_tomorrow');
   }
 }
 
-export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promise<Match[]> {
-  const cacheKey = `lskrd_v3_${day}`;
+export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promise<Array<Match>> {
+  const cacheKey = `lskrd_v4_${day}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
     try {
@@ -94,7 +104,7 @@ export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promi
   const json = await res.json();
   const rawFixtures = json.response || [];
 
-  const filtered: Match[] = rawFixtures
+  const filtered: Array<Match> = rawFixtures
     .filter((item: any) => Boolean(ALLOWED_LEAGUES[item.league?.id]))
     .map((item: any) => {
       const leagueId = item.league.id;
@@ -145,8 +155,7 @@ export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promi
   return filtered;
 }
 
-export function groupByLeague(matches: Match[]) {
-  const order =;
+export function groupByLeague(matches: Array<Match>) {
   const map = new Map<
     number,
     {
@@ -155,7 +164,7 @@ export function groupByLeague(matches: Match[]) {
       leagueLogo: string;
       country: string;
       flag: string | null;
-      matches: Match[];
+      matches: Array<Match>;
     }
   >();
 
@@ -174,7 +183,7 @@ export function groupByLeague(matches: Match[]) {
   }
 
   return Array.from(map.values()).sort(
-    (a, b) => order.indexOf(a.leagueId) - order.indexOf(b.leagueId),
+    (a, b) => (LEAGUE_ORDER[a.leagueId] || 99) - (LEAGUE_ORDER[b.leagueId] || 99),
   );
 }
 
