@@ -9,14 +9,13 @@ interface Props {
 }
 
 const TOP_LEAGUES = [
+  { id: 2, name: 'Champions League', logo: 'https://media.api-sports.io/football/leagues/2.png' },
   { id: 39, name: 'Premier League', logo: 'https://media.api-sports.io/football/leagues/39.png' },
   { id: 140, name: 'La Liga', logo: 'https://media.api-sports.io/football/leagues/140.png' },
-  { id: 71, name: 'Serie A', logo: 'https://media.api-sports.io/football/leagues/71.png' },
+  { id: 135, name: 'Serie A', logo: 'https://api-sports.io' },
   { id: 78, name: 'Bundesliga', logo: 'https://media.api-sports.io/football/leagues/78.png' },
   { id: 61, name: 'Ligue 1', logo: 'https://media.api-sports.io/football/leagues/61.png' },
-  { id: 2, name: 'Champions League', logo: 'https://media.api-sports.io/football/leagues/2.png' },
-  { id: 203, name: 'Saudi Pro League', logo: 'https://media.api-sports.io/football/leagues/203.png' },
-  { id: 250, name: 'Süper Lig', logo: 'https://media.api-sports.io/football/leagues/250.png' },
+  { id: 307, name: 'Saudi Pro League', logo: 'https://api-sports.io' },
 ];
 
 export function Sidebar({ matches, onMatchClick, onLeagueClick }: Props) {
