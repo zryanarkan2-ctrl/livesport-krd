@@ -1,179 +1,42 @@
-import type { Match, MatchStatus } from '@/types';
+// Vercel Serverless Function: /api/espn?path=/apis/site/v2/sports/soccer/eng.1/scoreboard?dates=20261122
+//
+// بۆچی؟
+//  - وەڵامەکان لە CDN ی Vercel کاش دەکرێن (٢٠ چرکە)، بۆیە ٥٠٠ بەکارهێنەر = تەنها چەند داواکارییەک بۆ ESPN.
+//  - ئەگەر ESPN CORS گۆڕی یان بلۆکی کرد، سایتەکەت ناڕووخێت.
+//  - تەنها ناونیشانەکانی تۆپی پێ (soccer) ڕێگەپێدراون، بۆیە ناتوانرێت وەک proxy ی گشتی بەکاربهێنرێت.
 
-const API_KEY = 'de11f00e343eaef017411a3540759b47';
-const BASE_URL = 'https://api-sports.io';
+const HOST = 'https://site.api.espn.com';
+const ALLOWED_PREFIXES = ['/apis/site/v2/sports/soccer/', '/apis/v2/sports/soccer/'];
 
-export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; logo: string }> = {
-  2: {
-    name: 'UEFA Champions League',
-    country: 'ئەوروپا',
-    logo: 'https://api-sports.io',
-  },
-  39: {
-    name: 'Premier League',
-    country: 'ئینگلتەرا',
-    logo: 'https://api-sports.io',
-  },
-  140: {
-    name: 'La Liga',
-    country: 'ئیسپانیا',
-    logo: 'https://api-sports.io',
-  },
-  135: {
-    name: 'Serie A',
-    country: 'ئیتاڵیا',
-    logo: 'https://api-sports.io',
-  },
-  78: {
-    name: 'Bundesliga',
-    country: 'ئەڵمانیا',
-    logo: 'https://api-sports.io',
-  },
-  61: {
-    name: 'Ligue 1',
-    country: 'فەڕەنسا',
-    logo: 'https://api-sports.io',
-  },
-  307: {
-    name: 'Saudi Pro League',
-    country: 'سعودیە',
-    logo: 'https://api-sports.io',
-  },
-};
+export default async function handler(req, res) {
+  const path = String(req.query.path || '');
 
-function getDateString(day: 'yesterday' | 'today' | 'tomorrow'): string {
-  const now = new Date();
-  const baghdadOffset = 3 * 60;
-  const localTime = new Date(now.getTime() + (baghdadOffset + now.getTimezoneOffset()) * 60000);
-  if (day === 'yesterday') localTime.setDate(localTime.getDate() - 1);
-  if (day === 'tomorrow') localTime.setDate(localTime.getDate() + 1);
-  return localTime.toISOString().split('T');
-}
+  const ok =
+    ALLOWED_PREFIXES.some((p) => path.startsWith(p)) &&
+    !path.includes('..') &&
+    !path.includes('//') &&
+    !path.includes('@') &&
+    path.length < 400;
 
-function mapStatus(short: string): MatchStatus {
-  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'].includes(short)) return 'live';
-  if (['FT', 'AET', 'PEN'].includes(short)) return 'finished';
-  return 'upcoming';
-}
-
-export function clearCache(day?: 'yesterday' | 'today' | 'tomorrow') {
-  if (day) {
-    localStorage.removeItem(`lskrd_v2_${day}`);
-  } else {
-    localStorage.removeItem('lskrd_v2_yesterday');
-    localStorage.removeItem('lskrd_v2_today');
-    localStorage.removeItem('lskrd_v2_tomorrow');
-  }
-}
-
-export async function getMatches(day: 'yesterday' | 'today' | 'tomorrow'): Promise<Match[]> {
-  const cacheKey = `lskrd_v2_${day}`;
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      if (Date.now() - parsed.timestamp < 10 * 60 * 1000) {
-        return parsed.data;
-      }
-    } catch {
-      localStorage.removeItem(cacheKey);
-    }
+  if (!ok) {
+    res.status(400).json({ error: 'bad path' });
+    return;
   }
 
-  const dateStr = getDateString(day);
-  const res = await fetch(`${BASE_URL}/fixtures?date=${dateStr}&timezone=Asia/Baghdad`, {
-    headers: {
-      'x-apisports-key': API_KEY,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error('نەتوانرا زانیاری یارییەکان بهێنرێت');
-  }
-
-  const json = await res.json();
-  const rawFixtures = json.response || [];
-
-  const filtered: Match[] = rawFixtures
-    .filter((item: any) => Boolean(ALLOWED_LEAGUES[item.league?.id]))
-    .map((item: any) => {
-      const leagueId = item.league.id;
-      const leagueInfo = ALLOWED_LEAGUES[leagueId];
-      const kickoffDate = new Date(item.fixture.date);
-      const kickoff = kickoffDate.toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Baghdad',
-      });
-
-      return {
-        id: String(item.fixture.id),
-        home: {
-          id: item.teams.home.id,
-          name: item.teams.home.name,
-          logo: item.teams.home.logo,
-        },
-        away: {
-          id: item.teams.away.id,
-          name: item.teams.away.name,
-          logo: item.teams.away.logo,
-        },
-        league: leagueInfo.name,
-        leagueId: leagueId,
-        leagueLogo: leagueInfo.logo,
-        country: leagueInfo.country,
-        flag: item.league.flag || null,
-        stadium: item.fixture.venue?.name || '',
-        kickoff,
-        statusShort: item.fixture.status.short,
-        status: mapStatus(item.fixture.status.short),
-        minute: item.fixture.status.elapsed,
-        scoreHome: item.goals.home,
-        scoreAway: item.goals.away,
-        day,
-      };
+  try {
+    const upstream = await fetch(HOST + path, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LiveSportKRD/1.0)' },
     });
 
-  localStorage.setItem(
-    cacheKey,
-    JSON.stringify({
-      timestamp: Date.now(),
-      data: filtered,
-    }),
-  );
-
-  return filtered;
-}
-
-export function groupByLeague(matches: Match[]) {
-  const order =;
-  const map = new Map<
-    number,
-    {
-      leagueId: number;
-      league: string;
-      leagueLogo: string;
-      country: string;
-      flag: string | null;
-      matches: Match[];
+    if (!upstream.ok) {
+      res.status(upstream.status).json({ error: `upstream ${upstream.status}` });
+      return;
     }
-  >();
 
-  for (const m of matches) {
-    if (!map.has(m.leagueId)) {
-      map.set(m.leagueId, {
-        leagueId: m.leagueId,
-        league: m.league,
-        leagueLogo: m.leagueLogo,
-        country: m.country,
-        flag: m.flag,
-        matches: [],
-      });
-    }
-    map.get(m.leagueId)!.matches.push(m);
+    const data = await upstream.json();
+    res.setHeader('Cache-Control', 's-maxage=20, stale-while-revalidate=60');
+    res.status(200).json(data);
+  } catch {
+    res.status(502).json({ error: 'upstream failed' });
   }
-
-  return Array.from(map.values()).sort(
-    (a, b) => order.indexOf(a.leagueId) - order.indexOf(b.leagueId),
-  );
 }
