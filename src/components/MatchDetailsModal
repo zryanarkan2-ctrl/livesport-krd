@@ -1,1 +1,281 @@
 
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
+import { getMatchDetails } from '@/lib/espn';
+import type { MatchDetails, MatchEvent, MatchX, TeamLineup } from '@/lib/espn-types';
+
+interface Props {
+  match: MatchX | null;
+  onClose: () => void;
+}
+
+type Tab = 'events' | 'stats' | 'lineups';
+
+const ICON: Record<MatchEvent['kind'], string> = {
+  goal: '⚽',
+  'own-goal': '⚽',
+  yellow: '🟨',
+  red: '🟥',
+  sub: '🔄',
+};
+
+function EventsList({ events, home, away }: { events: MatchEvent[]; home: string; away: string }) {
+  if (!events.length) return <p className="py-8 text-center text-slate-400">هێشتا هیچ ڕووداوێک تۆمار نەکراوە</p>;
+  return (
+    <ul className="space-y-2">
+      <li className="flex justify-between px-2 text-xs text-slate-500">
+        <span>{home}</span>
+        <span>{away}</span>
+      </li>
+      {events.map((e, i) => (
+        <li
+          key={i}
+          className={`flex items-center gap-3 rounded-lg bg-slate-800/50 px-3 py-2 text-sm ${
+            e.isHome ? 'flex-row' : 'flex-row-reverse'
+          }`}
+        >
+          <span className="w-12 text-xs text-slate-400" dir="ltr">
+            {e.minute}
+          </span>
+          <span>{ICON[e.kind]}</span>
+          <span className="text-slate-100" dir="ltr">
+            {e.player}
+            {e.kind === 'own-goal' && <span className="text-slate-400"> (own goal)</span>}
+            {e.extra && (
+              <span className="text-slate-400">
+                {e.kind === 'sub' ? ' ⇄ ' : ' · '}
+                {e.extra}
+              </span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function StatsList({ stats }: { stats: MatchDetails['stats'] }) {
+  if (!stats.length) return <p className="py-8 text-center text-slate-400">ستاتیستیک بەردەست نییە</p>;
+  return (
+    <div className="space-y-4">
+      {stats.map((s) => {
+        const total = s.homeNum + s.awayNum;
+        const hp = total ? (s.homeNum / total) * 100 : 50;
+        return (
+          <div key={s.label}>
+            <div className="mb-1 flex items-center justify-between text-sm">
+              <span className="font-semibold text-slate-100" dir="ltr">
+                {s.home}
+              </span>
+              <span className="text-slate-400">{s.label}</span>
+              <span className="font-semibold text-slate-100" dir="ltr">
+                {s.away}
+              </span>
+            </div>
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-700" dir="ltr">
+              <div className="bg-emerald-500" style={{ width: `${hp}%` }} />
+              <div className="bg-sky-500" style={{ width: `${100 - hp}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LineupColumn({ title, lineup }: { title: string; lineup: TeamLineup }) {
+  return (
+    <div className="flex-1">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="font-semibold text-slate-100">{title}</h4>
+        {lineup.formation && (
+          <span className="text-xs text-slate-400" dir="ltr">
+            {lineup.formation}
+          </span>
+        )}
+      </div>
+      <ul className="space-y-1 text-sm" dir="ltr">
+        {lineup.starters.map((p, i) => (
+          <li key={i} className="flex gap-2 text-slate-200">
+            <span className="w-6 text-slate-500">{p.number}</span>
+            <span className="flex-1">{p.name}</span>
+            <span className="text-xs text-slate-500">{p.pos}</span>
+          </li>
+        ))}
+      </ul>
+      {lineup.subs.length > 0 && (
+        <>
+          <p className="mb-1 mt-3 text-xs text-slate-500">جێگرەکان</p>
+          <ul className="space-y-1 text-sm" dir="ltr">
+            {lineup.subs.map((p, i) => (
+              <li key={i} className="flex gap-2 text-slate-400">
+                <span className="w-6 text-slate-600">{p.number}</span>
+                <span className="flex-1">{p.name}</span>
+                <span className="text-xs text-slate-600">{p.pos}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** وردەکاری یاری: ڕووداو، ستاتیستیک، لاینئەپ. ئەگەر یاری زیندوو بێت هەموو ٣٠ چرکە نوێ دەبێتەوە */
+export function MatchDetailsModal({ match, onClose }: Props) {
+  const [tab, setTab] = useState<Tab>('events');
+  const [details, setDetails] = useState<MatchDetails | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const matchId = match?.id;
+  const slug = match?.leagueSlug;
+  const isLive = match?.status === 'live';
+
+  useEffect(() => {
+    if (!matchId || !slug) return;
+    let cancelled = false;
+    setDetails(null);
+    setError(false);
+    setTab('events');
+
+    const load = async (initial: boolean) => {
+      if (initial) setLoading(true);
+      try {
+        const d = await getMatchDetails(slug, matchId);
+        if (!cancelled) {
+          setDetails(d);
+          setError(false);
+        }
+      } catch {
+        if (!cancelled && initial) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load(true);
+    const id = isLive ? window.setInterval(() => !document.hidden && load(false), 30_000) : undefined;
+    return () => {
+      cancelled = true;
+      if (id) window.clearInterval(id);
+    };
+  }, [matchId, slug, isLive]);
+
+  // Esc بۆ داخستن
+  useEffect(() => {
+    if (!match) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [match, onClose]);
+
+  if (!match) return null;
+
+  const tabs: Array<{ key: Tab; label: string; show: boolean }> = [
+    { key: 'events', label: 'ڕووداوەکان', show: true },
+    { key: 'stats', label: 'ستاتیستیک', show: true },
+    { key: 'lineups', label: 'لاینئەپ', show: Boolean(details?.lineups) },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        dir="rtl"
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-slate-800 bg-slate-950 sm:rounded-2xl"
+      >
+        {/* سەرەوە */}
+        <div className="sticky top-0 border-b border-slate-800 bg-slate-950/95 p-4 backdrop-blur">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs text-slate-400">
+              {match.league} · {match.country}
+            </span>
+            <button type="button" onClick={onClose} aria-label="داخستن" className="rounded p-1 text-slate-400 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-2" dir="ltr">
+            <div className="flex flex-1 flex-col items-center gap-1 text-center">
+              {match.home.logo && <img src={match.home.logo} alt="" className="h-12 w-12 object-contain" />}
+              <span className="text-sm font-semibold text-slate-100">{match.home.name}</span>
+            </div>
+            <div className="flex flex-col items-center px-2">
+              {match.status === 'upcoming' ? (
+                <span className="text-2xl font-bold text-slate-100">{match.kickoff}</span>
+              ) : (
+                <span className="text-3xl font-bold text-slate-100">
+                  {match.scoreHome} - {match.scoreAway}
+                </span>
+              )}
+              <span className={`text-xs ${isLive ? 'text-red-400' : 'text-slate-400'}`}>
+                {isLive && '● '}
+                {match.statusShort}
+              </span>
+            </div>
+            <div className="flex flex-1 flex-col items-center gap-1 text-center">
+              {match.away.logo && <img src={match.away.logo} alt="" className="h-12 w-12 object-contain" />}
+              <span className="text-sm font-semibold text-slate-100">{match.away.name}</span>
+            </div>
+          </div>
+
+          {(details?.venue || match.stadium) && (
+            <p className="mt-3 text-center text-xs text-slate-500">
+              {details?.venue || match.stadium}
+              {details?.attendance ? ` · ${details.attendance.toLocaleString('en-US')} تماشاکەر` : ''}
+              {details?.referee ? ` · ${details.referee}` : ''}
+            </p>
+          )}
+        </div>
+
+        {/* تابەکان */}
+        <div className="flex gap-1 border-b border-slate-800 px-4 pt-2">
+          {tabs
+            .filter((t) => t.show)
+            .map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`rounded-t-lg px-4 py-2 text-sm font-medium ${
+                  tab === t.key ? 'border-b-2 border-emerald-500 text-emerald-400' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+        </div>
+
+        {/* ناوەڕۆک */}
+        <div className="p-4">
+          {loading && <p className="py-10 text-center text-slate-400">چاوەڕێ بە...</p>}
+          {error && !loading && (
+            <p className="py-10 text-center text-slate-400">وردەکاری ئەم یاریە بەردەست نییە، دواتر هەوڵبدەرەوە</p>
+          )}
+          {details && !loading && (
+            <>
+              {tab === 'events' && <EventsList events={details.events} home={match.home.name} away={match.away.name} />}
+              {tab === 'stats' && <StatsList stats={details.stats} />}
+              {tab === 'lineups' && details.lineups && (
+                <div className="flex flex-col gap-6 sm:flex-row">
+                  <LineupColumn title={match.home.name} lineup={details.lineups.home} />
+                  <LineupColumn title={match.away.name} lineup={details.lineups.away} />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
