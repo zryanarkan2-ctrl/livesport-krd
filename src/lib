@@ -1,1 +1,724 @@
 
+import type { Match, MatchStatus } from '@/types';
+import type {
+  DayKey,
+  MatchDetails,
+  MatchEvent,
+  MatchX,
+  NewsItem,
+  StandingGroup,
+  StandingRow,
+  StatRow,
+  TeamLineup,
+  LineupPlayer,
+} from './espn-types';
+
+/* ------------------------------------------------------------------ */
+/*  ڕێکخستن                                                            */
+/* ------------------------------------------------------------------ */
+
+const ESPN_HOST = 'https://' + 'site.api.' + 'espn.com';
+const SITE_PATH = '/apis/site/v2/sports/soccer/';
+const V2_PATH = '/apis/v2/sports/soccer/';
+
+/** ئەگەر true بێت، داواکارییەکان یەکەم جار لە ڕێگەی /api/espn (Vercel) دەڕۆن و کاش دەکرێن.
+ *  ئەگەر ئەو فەنکشنە نەبوو، خۆکار دەگەڕێتەوە بۆ ڕاستەوخۆ ESPN. */
+const USE_PROXY = true;
+
+export const LEAGUES = [
+  { id: 2, slug: 'uefa.champions', name: 'UEFA Champions League', country: 'ئەوروپا' },
+  { id: 3, slug: 'uefa.europa', name: 'UEFA Europa League', country: 'ئەوروپا' },
+  { id: 848, slug: 'uefa.europa.conf', name: 'Conference League', country: 'ئەوروپا' },
+  { id: 39, slug: 'eng.1', name: 'Premier League', country: 'ئینگلتەرا' },
+  { id: 140, slug: 'esp.1', name: 'La Liga', country: 'ئیسپانیا' },
+  { id: 135, slug: 'ita.1', name: 'Serie A', country: 'ئیتاڵیا' },
+  { id: 78, slug: 'ger.1', name: 'Bundesliga', country: 'ئەڵمانیا' },
+  { id: 61, slug: 'fra.1', name: 'Ligue 1', country: 'فەڕەنسا' },
+  { id: 307, slug: 'ksa.1', name: 'Saudi Pro League', country: 'سعودیە' },
+  { id: 88, slug: 'ned.1', name: 'Eredivisie', country: 'هۆڵەندا' },
+  { id: 94, slug: 'por.1', name: 'Primeira Liga', country: 'پورتوگال' },
+  { id: 203, slug: 'tur.1', name: 'Süper Lig', country: 'تورکیا' },
+  { id: 10, slug: 'fifa.friendly', name: 'International Friendlies', country: 'جیهان' },
+] as const;
+
+/** ڕیزبەندی لیگەکان: ئەوەی لە سەرەوەی لیستەکەیە لە سەرەوە دەردەکەوێت */
+export const LEAGUE_ORDER: Record<number, number> = Object.fromEntries(
+  LEAGUES.map((l, i) => [l.id, i + 1]),
+);
+
+/** ئەو لیگانەی پلەبەندییان هەیە (دەرەوەی یاری دۆستانە) */
+export const STANDINGS_LEAGUES = LEAGUES.filter((l) => l.slug !== 'fifa.friendly');
+
+/* ------------------------------------------------------------------ */
+/*  فەنکشنی fetch (proxy ← ESPN ڕاستەوخۆ)                            */
+/* ------------------------------------------------------------------ */
+
+let proxyDisabled = false;
+
+async function espnFetch(path: string): Promise<any> {
+  if (USE_PROXY && !proxyDisabled) {
+    try {
+      const res = await fetch(`/api/espn?path=${encodeURIComponent(path)}`);
+      if (res.ok) return await res.json();
+      if (res.status === 404) proxyDisabled = true; // فەنکشنەکە نییە (مەسەلەن لە dev)
+    } catch {
+      // وەڵامەکە JSON نەبوو (SPA fallback) یان تۆڕ کێشەی هەبوو
+      proxyDisabled = true;
+    }
+  }
+  const res = await fetch(`${ESPN_HOST}${path}`);
+  if (!res.ok) throw new Error(`ESPN ${res.status}`);
+  return res.json();
+}
+
+/* ------------------------------------------------------------------ */
+/*  بەروارەکان (هەمووی بە کاتی بەغدا)                                  */
+/* ------------------------------------------------------------------ */
+
+const BAGHDAD_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+function baghdadDateStr(ms: number): string {
+  return new Date(ms + BAGHDAD_OFFSET_MS).toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+function shiftDate(yyyymmdd: string, delta: number): string {
+  const y = Number(yyyymmdd.slice(0, 4));
+  const m = Number(yyyymmdd.slice(4, 6)) - 1;
+  const d = Number(yyyymmdd.slice(6, 8));
+  return new Date(Date.UTC(y, m, d + delta)).toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+/** 'today' | 'yesterday' | 'tomorrow' | 'YYYYMMDD'  ←  'YYYYMMDD' */
+export function resolveDate(day: string): string {
+  if (/^\d{8}$/.test(day)) return day;
+  const shift = day === 'yesterday' ? -1 : day === 'tomorrow' ? 1 : 0;
+  return baghdadDateStr(Date.now() + shift * 86_400_000);
+}
+
+/** بەرواری YYYYMMDD بۆ نووسینێکی خوێنراو */
+export function formatDayLabel(yyyymmdd: string): string {
+  return `${yyyymmdd.slice(0, 4)}/${yyyymmdd.slice(4, 6)}/${yyyymmdd.slice(6, 8)}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  کاش                                                                */
+/* ------------------------------------------------------------------ */
+
+const CACHE_PREFIX = 'lskrd_v2_';
+
+function readCache(key: string): MatchX[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < parsed.ttl) return parsed.data;
+  } catch {
+    localStorage.removeItem(CACHE_PREFIX + key);
+  }
+  return null;
+}
+
+function writeCache(key: string, data: MatchX[]) {
+  // یاری زیندوو: ٣٠ چرکە | هەموو تەواو بووە: ٣٠ خولەک | ئەوانی تر: ٢ خولەک
+  const hasLive = data.some((m) => m.status === 'live');
+  const allDone = data.length > 0 && data.every((m) => m.status === 'finished');
+  const ttl = hasLive ? 30_000 : allDone ? 30 * 60_000 : 2 * 60_000;
+  try {
+    localStorage.setItem(
+      CACHE_PREFIX + key,
+      JSON.stringify({ timestamp: Date.now(), ttl, data }),
+    );
+  } catch {
+    // localStorage پڕە یان بەردەست نییە
+  }
+}
+
+export function clearCache(day?: string) {
+  try {
+    if (day) {
+      localStorage.removeItem(CACHE_PREFIX + resolveDate(day));
+      return;
+    }
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(CACHE_PREFIX) || k.startsWith('lskrd_espn_'))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // هیچ
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  یاریەکان                                                           */
+/* ------------------------------------------------------------------ */
+
+function mapEvent(ev: any, lg: (typeof LEAGUES)[number], leagueLogo: string, day: string): MatchX | null {
+  const comp = ev.competitions?.[0];
+  if (!comp) return null;
+  const homeComp = comp.competitors?.find((c: any) => c.homeAway === 'home');
+  const awayComp = comp.competitors?.find((c: any) => c.homeAway === 'away');
+  if (!homeComp || !awayComp) return null;
+
+  const state = ev.status?.type?.state;
+  const typeName: string = ev.status?.type?.name || '';
+  let status: MatchStatus = 'upcoming';
+  if (state === 'in') status = 'live';
+  else if (state === 'post') status = 'finished';
+  // دواخراو / هەڵوەشاوە: وەک "هێشتا نەکراوە" نیشان بدە، نەک 0-0
+  if (/POSTPONED|CANCEL|DELAYED|SUSPENDED|ABANDONED/i.test(typeName)) status = 'upcoming';
+
+  const kickoff = new Date(ev.date).toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Baghdad',
+  });
+
+  const minuteNum = parseInt(ev.status?.displayClock || '', 10);
+  const hasScore = status === 'live' || status === 'finished';
+
+  return {
+    id: String(ev.id),
+    home: {
+      id: Number(homeComp.team?.id) || 0,
+      name: homeComp.team?.shortDisplayName || homeComp.team?.name || 'Home',
+      logo: homeComp.team?.logo || '',
+    },
+    away: {
+      id: Number(awayComp.team?.id) || 0,
+      name: awayComp.team?.shortDisplayName || awayComp.team?.name || 'Away',
+      logo: awayComp.team?.logo || '',
+    },
+    league: lg.name,
+    leagueId: lg.id,
+    leagueLogo,
+    country: lg.country,
+    flag: null,
+    stadium: comp.venue?.fullName || '',
+    kickoff,
+    statusShort: ev.status?.type?.shortDetail || '',
+    status,
+    minute: Number.isNaN(minuteNum) ? null : minuteNum,
+    scoreHome: hasScore ? Number(homeComp.score ?? 0) : null,
+    scoreAway: hasScore ? Number(awayComp.score ?? 0) : null,
+    day,
+    leagueSlug: lg.slug,
+    startTime: ev.date,
+  } as MatchX;
+}
+
+/** یاریەکانی ڕۆژێک. day: 'yesterday' | 'today' | 'tomorrow' | 'YYYYMMDD' */
+export async function getMatches(
+  day: string,
+  opts: { force?: boolean } = {},
+): Promise<MatchX[]> {
+  const target = resolveDate(day);
+
+  if (!opts.force) {
+    const cached = readCache(target);
+    if (cached) return cached;
+  }
+
+  // ESPN ڕۆژەکان بە کاتی ئەمریکا دابەش دەکات، بۆیە ڕۆژی پێش و دوای ئەویش دەهێنین
+  // و دواتر بە کاتی بەغدا فلتەریان دەکەین. ئەمە یاری نیوەشەو لە دەست نادات.
+  const range = `${shiftDate(target, -1)}-${shiftDate(target, 1)}`;
+  const byId = new Map<string, MatchX>();
+  let failed = 0;
+
+  await Promise.all(
+    LEAGUES.map(async (lg) => {
+      try {
+        const data = await espnFetch(`${SITE_PATH}${lg.slug}/scoreboard?dates=${range}&limit=300`);
+        const leagueLogo: string = data.leagues?.[0]?.logos?.[0]?.href || '';
+        for (const ev of data.events || []) {
+          if (baghdadDateStr(new Date(ev.date).getTime()) !== target) continue;
+          const m = mapEvent(ev, lg, leagueLogo, day);
+          if (m) byId.set(`${lg.id}-${m.id}`, m);
+        }
+      } catch (err) {
+        failed += 1;
+        console.error(`Failed to load ${lg.name}:`, err);
+      }
+    }),
+  );
+
+  // ئەگەر هەموو لیگەکان شکستیان هێنا، هەڵە فڕێ بدە (نەک لیستی بەتاڵ)
+  if (failed === LEAGUES.length) throw new Error('Failed to fetch');
+
+  const matches = Array.from(byId.values()).sort((a, b) =>
+    (a.startTime || '').localeCompare(b.startTime || ''),
+  );
+
+  // تەنها ئەگەر هیچ لیگێک شکستی نەهێنابێت کاش بکە
+  if (failed === 0) writeCache(target, matches);
+  return matches;
+}
+
+/** تەنها یاریە زیندووەکان (دوێنێ + ئەمڕۆ، چونکە یاری نیوەشەو بۆ ڕۆژی پێشوو دەچێت) */
+export async function getLiveMatches(opts: { force?: boolean } = {}): Promise<MatchX[]> {
+  const [y, t] = await Promise.all([
+    getMatches('yesterday', opts).catch(() => [] as MatchX[]),
+    getMatches('today', opts),
+  ]);
+  return [...y, ...t].filter((m) => m.status === 'live');
+}
+
+/** پیشاندانی یاری بەپێی ڕۆژ یان 'live' */
+export function getMatchesFor(day: DayKey, opts: { force?: boolean } = {}): Promise<MatchX[]> {
+  return day === 'live' ? getLiveMatches(opts) : getMatches(day, opts);
+}
+
+export function groupByLeague(matches: Array<Match>) {
+  const map = new Map<
+    number,
+    {
+      leagueId: number;
+      league: string;
+      leagueLogo: string;
+      country: string;
+      flag: string | null;
+      matches: Array<Match>;
+    }
+  >();
+
+  for (const m of matches) {
+    if (!map.has(m.leagueId)) {
+      map.set(m.leagueId, {
+        leagueId: m.leagueId,
+        league: m.league,
+        leagueLogo: m.leagueLogo,
+        country: m.country,
+        flag: m.flag,
+        matches: [],
+      });
+    }
+    map.get(m.leagueId)!.matches.push(m);
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => (LEAGUE_ORDER[a.leagueId] || 99) - (LEAGUE_ORDER[b.leagueId] || 99),
+  );
+}
+
+export function formatKickoff(kickoff: string): string {
+  return kickoff;
+}
+
+/** گەڕان لە ناو یاریە هێنراوەکان: ناوی تیم، لیگ، وڵات */
+export function filterMatches<T extends Match>(matches: T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return matches;
+  return matches.filter((m) =>
+    [m.home.name, m.away.name, m.league, m.country].some((s) => s.toLowerCase().includes(q)),
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  وردەکاری یاری                                                      */
+/* ------------------------------------------------------------------ */
+
+const STAT_LABELS: Array<[string, string]> = [
+  ['possessionPct', 'خاوەندارێتی توپ'],
+  ['totalShots', 'شووت'],
+  ['shotsOnTarget', 'شووتی ڕاست'],
+  ['wonCorners', 'کۆرنەر'],
+  ['foulsCommitted', 'فاوڵ'],
+  ['offsides', 'ئۆفسایید'],
+  ['yellowCards', 'کارتی زەرد'],
+  ['redCards', 'کارتی سوور'],
+  ['saves', 'ڕزگارکردن'],
+];
+
+function toNum(v: unknown): number {
+  const n = parseFloat(String(v ?? '').replace('%', ''));
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function parseLineup(roster: any): TeamLineup {
+  const players: LineupPlayer[] = (roster?.roster || []).map((p: any) => ({
+    name: p.athlete?.displayName || p.athlete?.shortName || '',
+    number: String(p.jersey ?? ''),
+    pos: p.position?.abbreviation || '',
+    starter: Boolean(p.starter),
+  }));
+  const strip = ({ starter: _s, ...rest }: any): LineupPlayer => rest;
+  return {
+    formation: roster?.formation || '',
+    starters: players.filter((p: any) => p.starter).map(strip),
+    subs: players.filter((p: any) => !p.starter).map(strip),
+  };
+}
+
+export async function getMatchDetails(leagueSlug: string, eventId: string): Promise<MatchDetails> {
+  const data = await espnFetch(`${SITE_PATH}${leagueSlug}/summary?event=${eventId}`);
+
+  const competitors: any[] = data.header?.competitions?.[0]?.competitors || [];
+  const homeId = String(competitors.find((c) => c.homeAway === 'home')?.team?.id ?? '');
+
+  // ڕووداوەکان (گۆڵ، کارت، گۆڕانکاری)
+  const events: MatchEvent[] = [];
+  for (const k of data.keyEvents || []) {
+    const t = String(k.type?.text || '').toLowerCase();
+    if (t.includes('disallow')) continue;
+
+    let kind: MatchEvent['kind'] | null = null;
+    if (t.includes('own goal')) kind = 'own-goal';
+    else if (t.includes('goal') || (t.includes('penalty') && t.includes('scored'))) kind = 'goal';
+    else if (t.includes('yellow')) kind = 'yellow';
+    else if (t.includes('red card')) kind = 'red';
+    else if (t.includes('substitution')) kind = 'sub';
+    if (!kind) continue;
+
+    const names: string[] = (k.participants || [])
+      .map((p: any) => p.athlete?.displayName)
+      .filter(Boolean);
+
+    events.push({
+      kind,
+      minute: k.clock?.displayValue || '',
+      isHome: String(k.team?.id ?? '') === homeId,
+      player: names[0] || k.shortText || '',
+      extra: names[1],
+    });
+  }
+
+  // ستاتیستیک
+  const stats: StatRow[] = [];
+  const teams: any[] = data.boxscore?.teams || [];
+  const isHomeTeam = (t: any) =>
+    t.homeAway ? t.homeAway === 'home' : String(t.team?.id ?? '') === homeId;
+  const homeStats: any[] = teams.find(isHomeTeam)?.statistics || [];
+  const awayStats: any[] = teams.find((t) => !isHomeTeam(t))?.statistics || [];
+
+  for (const [name, label] of STAT_LABELS) {
+    const h = homeStats.find((s) => s.name === name);
+    const a = awayStats.find((s) => s.name === name);
+    if (!h && !a) continue;
+    const suffix = name === 'possessionPct' ? '%' : '';
+    stats.push({
+      label,
+      home: `${h?.displayValue ?? '0'}${suffix}`,
+      away: `${a?.displayValue ?? '0'}${suffix}`,
+      homeNum: toNum(h?.displayValue),
+      awayNum: toNum(a?.displayValue),
+    });
+  }
+
+  // لاینئەپ
+  const rosters: any[] = data.rosters || [];
+  const hr = rosters.find((r) => r.homeAway === 'home');
+  const ar = rosters.find((r) => r.homeAway === 'away');
+  const lineups = hr && ar ? { home: parseLineup(hr), away: parseLineup(ar) } : null;
+
+  return {
+    events,
+    stats,
+    lineups: lineups && (lineups.home.starters.length || lineups.away.starters.length) ? lineups : null,
+    venue: data.gameInfo?.venue?.fullName,
+    attendance: data.gameInfo?.attendance || undefined,
+    referee: data.gameInfo?.officials?.[0]?.displayName || data.gameInfo?.officials?.[0]?.fullName,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  پلەبەندی                                                           */
+/* ------------------------------------------------------------------ */
+
+export async function getStandings(leagueSlug: string): Promise<StandingGroup[]> {
+  const data = await espnFetch(`${V2_PATH}${leagueSlug}/standings`);
+  const nodes: any[] = data.children?.length ? data.children : [data];
+
+  const groups: StandingGroup[] = nodes.map((node) => {
+    const rows: StandingRow[] = (node.standings?.entries || []).map((entry: any, i: number) => {
+      const val = (name: string) => {
+        const s = (entry.stats || []).find((x: any) => x.name === name);
+        return Number(s?.value ?? 0);
+      };
+      return {
+        rank: val('rank') || i + 1,
+        teamId: Number(entry.team?.id) || 0,
+        team: entry.team?.shortDisplayName || entry.team?.displayName || entry.team?.name || '',
+        logo: entry.team?.logos?.[0]?.href || '',
+        played: val('gamesPlayed'),
+        wins: val('wins'),
+        draws: val('ties'),
+        losses: val('losses'),
+        gf: val('pointsFor'),
+        ga: val('pointsAgainst'),
+        gd: val('pointDifferential'),
+        points: val('points'),
+      };
+    });
+    rows.sort((a, b) => a.rank - b.rank);
+    return { name: node.name || '', rows };
+  });
+
+  return groups.filter((g) => g.rows.length > 0);
+}
+
+/* ------------------------------------------------------------------ */
+/*  هەواڵ (بە ئینگلیزی، ESPN وەرگێڕانی کوردی نییە)                    */
+/* ------------------------------------------------------------------ */
+
+export async function getNews(leagueSlug = 'all', limit = 20): Promise<NewsItem[]> {
+  const data = await espnFetch(`${SITE_PATH}${leagueSlug}/news?limit=${limit}`);
+  return (data.articles || []).map((a: any, i: number) => ({
+    id: String(a.id ?? i),
+    headline: a.headline || '',
+    description: a.description || '',
+    url: a.links?.web?.href || '',
+    image: a.images?.[0]?.url || '',
+    published: a.published || '',
+  }));
+}
+
+import type { Match } from '@/types';
+
+/** Match + ئەو خانانەی نوێ زیادمان کردوون (بێ گۆڕینی src/types) */
+export type MatchX = Match & {
+  /** slug ی ESPN بۆ لیگەکە، بۆ وردەکاری یاری و پلەبەندی */
+  leagueSlug?: string;
+  /** کاتی دەستپێکردن بە ISO، بۆ ڕیزکردن و بیرهێنەرەوە */
+  startTime?: string;
+};
+
+/** 'live' = تەنها یاریە زیندووەکان، 'yesterday'|'today'|'tomorrow'، یان بەروار بە شێوەی YYYYMMDD */
+export type DayKey = 'live' | 'yesterday' | 'today' | 'tomorrow' | (string & {});
+
+export type EventKind = 'goal' | 'own-goal' | 'yellow' | 'red' | 'sub';
+
+export interface MatchEvent {
+  kind: EventKind;
+  minute: string;
+  isHome: boolean;
+  player: string;
+  /** یاریزانی دووەم: یارمەتیدەر یان جێگرەوە */
+  extra?: string;
+}
+
+export interface StatRow {
+  label: string;
+  home: string;
+  away: string;
+  homeNum: number;
+  awayNum: number;
+}
+
+export interface LineupPlayer {
+  name: string;
+  number: string;
+  pos: string;
+}
+
+export interface TeamLineup {
+  formation: string;
+  starters: LineupPlayer[];
+  subs: LineupPlayer[];
+}
+
+export interface MatchDetails {
+  events: MatchEvent[];
+  stats: StatRow[];
+  lineups: { home: TeamLineup; away: TeamLineup } | null;
+  venue?: string;
+  attendance?: number;
+  referee?: string;
+}
+
+export interface StandingRow {
+  rank: number;
+  teamId: number;
+  team: string;
+  logo: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  gf: number;
+  ga: number;
+  gd: number;
+  points: number;
+}
+
+export interface StandingGroup {
+  name: string;
+  rows: StandingRow[];
+}
+
+export interface NewsItem {
+  id: string;
+  headline: string;
+  description: string;
+  url: string;
+  image: string;
+  published: string;
+}
+
+import { useCallback, useEffect, useState } from 'react';
+
+const KEY = 'lskrd_favs_v1';
+
+export interface Favorites {
+  teams: number[];
+  leagues: number[];
+}
+
+const EMPTY: Favorites = { teams: [], leagues: [] };
+
+function read(): Favorites {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return EMPTY;
+    const p = JSON.parse(raw);
+    return {
+      teams: Array.isArray(p.teams) ? p.teams : [],
+      leagues: Array.isArray(p.leagues) ? p.leagues : [],
+    };
+  } catch {
+    return EMPTY;
+  }
+}
+
+function write(f: Favorites) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(f));
+    window.dispatchEvent(new Event('lskrd-favs'));
+  } catch {
+    // localStorage بەردەست نییە
+  }
+}
+
+/** تیم و لیگە بەدڵەکان، لە localStorage هەڵدەگیرێن و لە هەموو کۆمپۆنێنتەکان هاوکات دەبن */
+export function useFavorites() {
+  const [favs, setFavs] = useState<Favorites>(read);
+
+  useEffect(() => {
+    const sync = () => setFavs(read());
+    window.addEventListener('lskrd-favs', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('lskrd-favs', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const toggleTeam = useCallback((id: number) => {
+    const cur = read();
+    write({
+      ...cur,
+      teams: cur.teams.includes(id) ? cur.teams.filter((x) => x !== id) : [...cur.teams, id],
+    });
+  }, []);
+
+  const toggleLeague = useCallback((id: number) => {
+    const cur = read();
+    write({
+      ...cur,
+      leagues: cur.leagues.includes(id) ? cur.leagues.filter((x) => x !== id) : [...cur.leagues, id],
+    });
+  }, []);
+
+  const isTeamFav = useCallback((id: number) => favs.teams.includes(id), [favs]);
+  const isLeagueFav = useCallback((id: number) => favs.leagues.includes(id), [favs]);
+
+  return { favs, toggleTeam, toggleLeague, isTeamFav, isLeagueFav };
+}
+
+import type { MatchX } from './espn-types';
+
+/**
+ * بیرهێنەرەوەی پێش یاری.
+ *
+ * سنووردارییەکە: ئەمە تەنها کاتێک کار دەکات کە پەیجەکە (تاب) کراوە بێت، چونکە
+ * بە setTimeout و Notification API ی وێبگەڕ کار دەکات. بۆ ئاگادارکردنەوەی ڕاستەقینە
+ * کاتێک وێبگەڕ داخراوە، پێویستت بە Service Worker + Web Push + سێرڤەرە، کە پڕۆژەیەکی جیاوازە.
+ */
+
+const KEY = 'lskrd_reminders_v1';
+const timers = new Map<string, number>();
+
+interface Reminder {
+  id: string;
+  at: number; // کاتی ئاگادارکردنەوە (ms)
+  title: string;
+  body: string;
+}
+
+function load(): Reminder[] {
+  try {
+    return JSON.parse(localStorage.getItem(KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function save(list: Reminder[]) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list));
+    window.dispatchEvent(new Event('lskrd-reminders'));
+  } catch {
+    // localStorage بەردەست نییە
+  }
+}
+
+export function notificationsSupported(): boolean {
+  return typeof window !== 'undefined' && 'Notification' in window;
+}
+
+export async function ensureNotificationPermission(): Promise<boolean> {
+  if (!notificationsSupported()) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  return (await Notification.requestPermission()) === 'granted';
+}
+
+function arm(r: Reminder) {
+  const delay = r.at - Date.now();
+  if (delay <= 0 || delay > 2_000_000_000) return;
+  window.clearTimeout(timers.get(r.id));
+  timers.set(
+    r.id,
+    window.setTimeout(() => {
+      try {
+        new Notification(r.title, { body: r.body });
+      } catch {
+        // هیچ
+      }
+      removeReminder(r.id);
+    }, delay),
+  );
+}
+
+export function hasReminder(matchId: string): boolean {
+  return load().some((r) => r.id === matchId);
+}
+
+export function removeReminder(matchId: string) {
+  window.clearTimeout(timers.get(matchId));
+  timers.delete(matchId);
+  save(load().filter((r) => r.id !== matchId));
+}
+
+/** بیرهێنەرەوە دابنێ. false دەگەڕێنێتەوە ئەگەر ڕێگەپێدان نەدرا یان یاری دەستی پێکردووە */
+export async function setReminder(match: MatchX, minutesBefore = 15): Promise<boolean> {
+  if (!match.startTime) return false;
+  const at = new Date(match.startTime).getTime() - minutesBefore * 60_000;
+  if (at <= Date.now()) return false;
+  if (!(await ensureNotificationPermission())) return false;
+
+  const r: Reminder = {
+    id: match.id,
+    at,
+    title: `${match.home.name} - ${match.away.name}`,
+    body: `${match.league} · ${match.kickoff} (${minutesBefore} خولەکی تر)`,
+  };
+  save([...load().filter((x) => x.id !== r.id), r]);
+  arm(r);
+  return true;
+}
+
+/** لە دەستپێکی ئەپەکە یەک جار بانگ بکە، بۆ ئەوەی بیرهێنەرەوەکانی پێشوو دووبارە چالاک بن */
+export function restoreReminders() {
+  const now = Date.now();
+  const alive = load().filter((r) => r.at > now);
+  save(alive);
+  alive.forEach(arm);
+}
