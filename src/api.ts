@@ -177,3 +177,6 @@ export function groupByLeague(matches: Match[]) {
     (a, b) => order.indexOf(a.leagueId) - order.indexOf(b.leagueId),
   );
 }
+export function formatKickoff(kickoff: string): string {
+  return kickoff;
+}
