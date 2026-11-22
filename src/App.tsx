@@ -39,7 +39,6 @@ interface StreamLinks {
 const SUPABASE_URL = 'https://supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FpHs9PFk69xUttciSQLksg_hUFoSt14';
 
-// یارمەتیدەر بۆ گۆڕینی لینکی ئاسایی یوتیوب بۆ لینکی Embed
 function formatEmbedUrl(url: string): string {
   if (!url) return '';
   const trimmed = url.trim();
@@ -62,12 +61,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // دۆخەکانی پەڕەی بینینی یاری و سێرڤەرەکان
   const [activeServer, setActiveServer] = useState<'server_1' | 'server_2' | 'youtube_url' | 'highlights_url'>('server_1');
   const [currentStreams, setCurrentStreams] = useState<StreamLinks | null>(null);
   const [loadingStreams, setLoadingStreams] = useState(false);
 
-  // دۆخەکانی پانێڵی ئادمین
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [adminError, setAdminError] = useState('');
@@ -97,7 +94,6 @@ export default function App() {
     loadMatches(day);
   }, [day, nav, loadMatches]);
 
-  // هێنانی لینکەکانی یاری لە Supabase کاتێک کلیک لە یارییەک دەکرێت
   const fetchStreamsForMatch = async (matchId: string) => {
     setLoadingStreams(true);
     try {
@@ -138,7 +134,6 @@ export default function App() {
     fetchStreamsForMatch(m.id);
   };
 
-  // هەڵبژاردنی یاری لە پانێڵی ئادمین
   const handleSelectAdminMatch = async (matchId: string) => {
     setEditingMatchId(matchId);
     setSaveSuccess(false);
@@ -156,7 +151,6 @@ export default function App() {
     }
   };
 
-  // خەزنکردنی لینکەکان لە Supabase
   const handleSaveStreams = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMatchId) return;
@@ -213,7 +207,6 @@ export default function App() {
       />
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        {/* پەڕەی بینینی یاری و سێرڤەرەکان */}
         {selected ? (
           <div className="animate-fadeIn space-y-6">
             <button
@@ -224,7 +217,6 @@ export default function App() {
               گەڕانەوە بۆ خشتەی یارییەکان
             </button>
 
-            {/* کارتی ئەنجام و زانیاری یاری */}
             <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-slate-900 to-slate-900/60 p-6">
               <div className="mb-4 text-center">
                 <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
@@ -233,7 +225,6 @@ export default function App() {
               </div>
 
               <div className="flex items-center justify-between gap-4 sm:justify-around">
-                {/* یانەی میواندار */}
                 <div className="flex flex-col items-center gap-3 text-center">
                   <img
                     src={selected.home.logo}
@@ -243,7 +234,6 @@ export default function App() {
                   <h2 className="text-base font-extrabold sm:text-xl">{selected.home.name}</h2>
                 </div>
 
-                {/* ئەنجام یان کات */}
                 <div className="flex flex-col items-center gap-2">
                   <div className="rounded-2xl border border-white/10 bg-slate-950 px-6 py-3 text-2xl font-black tracking-wider text-white sm:text-4xl">
                     {selected.status === 'upcoming'
@@ -267,7 +257,6 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* یانەی میوان */}
                 <div className="flex flex-col items-center gap-3 text-center">
                   <img
                     src={selected.away.logo}
@@ -279,21 +268,22 @@ export default function App() {
               </div>
             </div>
 
-            {/* دوگمەکانی گۆڕینی سێرڤەر */}
             <div className="rounded-2xl border border-white/[0.08] bg-slate-900/80 p-4 sm:p-6">
               <div className="mb-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
                 <button
                   onClick={() => setActiveServer('server_1')}
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
-activeServer === 'server_1'
-? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25'
-: 'bg-slate-800 text-gray-300 hover:bg-slate-700'
-}`}
->
+                    activeServer === 'server_1'
+                      ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25'
+                      : 'bg-slate-800 text-gray-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Tv className="h-4 w-4" />
+                  سێرڤەری سەرەکی
+                </button>
 
-سێرڤەری سەرەکی
-<button
-onClick={() => setActiveServer('server_2')}
+                <button
+                  onClick={() => setActiveServer('server_2')}
 className={flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${ activeServer === 'server_2' ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25' : 'bg-slate-800 text-gray-300 hover:bg-slate-700' }}
 >
 
@@ -310,8 +300,6 @@ className={flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold tran
 >
 
 کورتەی یاری
-
-{/* چوارگۆشەی پلەیەری ڤیدیۆ /}
 
 {loadingStreams ? (
 
@@ -337,7 +325,6 @@ className={flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold tran
 
 
 ) : nav === 'admin' ? (
-/ پانێڵی بەڕێوەبردن (Admin Panel) */
 
 {!adminUnlocked ? (
 
@@ -460,7 +447,6 @@ className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm tex
 
 ) : (
 <>
-{/* Hero banner — only on today */}
 {nav === 'today' && (
 
 
@@ -488,10 +474,8 @@ className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm tex
 
 
 )}
-{/* Matches section with 2-column layout /}
 {(nav === 'today' || nav === 'live') && (
 
-{/ Main feed */}
 
 <DayTabs
 active={day}
@@ -541,8 +525,6 @@ onClick={() => handleOpenMatch(m)}
 هیچ یارییەک لەم ڕۆژەدا بەردەست نییە
 
 )}
-{/* Sidebar */}
-
 <Sidebar
 matches={matches}
 onMatchClick={handleOpenMatch}
@@ -555,15 +537,6 @@ onLeagueClick={() => setNav('leagues')}
 {nav === 'news' && }
 </>
 )}
-{/* Footer */}
-
-
-
-
-
-
-
-
 Live Sport KRD
 پەخشی زیندووی وەرزشی
 
@@ -589,17 +562,9 @@ className="text-xs text-gray-600 transition hover:text-emerald-400"
 );
 }
 
-4. پاشان کلیک لە دوگمە سەوزەکەی **`Commit changes`** بکە لە GitHub.
-
----
-
-### چۆن تاقی بکەیتەوە دوای ٣٠ چرکە؟
-1. بچۆ سەر وێبسایتەکەت (**`https://livesportkrd.vercel.app`**).
-2. بڕۆ خوارەوەی وێبسایتەکە (Footer) و کلیک لە وشەی بچووکی **`بەڕێوەبردن`** بکە.
-3. وشەی نهێنی **`KRD2026@`** بنووسە و بچۆ ژوورەوە.
-4. یارییەک هەڵبژێرە، لینکی ڤیدیۆیەکی فەرمی یوتیوبی تێدا دابنێ و **خەزنکردنی لینکەکان** دابگرە.
-5. بگەڕێوە پەڕەی سەرەکی و کلیک لە هەمان یاری بکە — دەبینیت پەڕەی بینینی یاری بە ٤ دوگمەی سێرڤەرەوە دەکرێتەوە و ڤیدیۆکە لێدەدات!
+4. کلیک لە دوگمە سەوزەکەی **`Commit changes`** بکە لە GitHub.
+5. ٣٠ چرکە چاوەڕێ بکە؛ لە Vercel نیشانەکە دەبێتە سەوز (**Ready**)، و کاتێک دەچیتە سەر `livesportkrd.vercel.app`، دەتوانیت بچیتە خوارەوەی پەڕەکە و کلیک لە **`بەڕێوەبردن`** بکەیت.
 
 <FollowUp>
-کۆدەکە بخەرە ناو `src/App.tsx` لە GitHub و **Commit changes** دابگرە؛ پێم بڵێ دوای ٣٠ چرکە کاتێک **پەڕەی بینینی یاری و پانێڵی بەڕێوەبردن**ـت تاقی کردەوە!
+ئەم کۆدە چاککراوە بخەرە ناو `src/App.tsx` و **Commit changes** دابگرە؛ پێم بڵێ دوای ٣٠ چرکە کاتێک **Ready** بوو و پەڕەی بینینی یاریت تاقی کردەوە!
 </FollowUp>
