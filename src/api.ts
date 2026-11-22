@@ -42,7 +42,6 @@ export const ALLOWED_LEAGUES: Record<number, { name: string; country: string; lo
 };
 
 function getDateString(day: 'yesterday' | 'today' | 'tomorrow'): string {
-  function getDateString(day: 'yesterday' | 'today' | 'tomorrow'): string {
   const now = new Date();
   const baghdadOffset = 3 * 60;
   const localTime = new Date(now.getTime() + (baghdadOffset + now.getTimezoneOffset()) * 60000);
