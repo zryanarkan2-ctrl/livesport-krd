@@ -61,7 +61,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeServer, setActiveServer] = useState<'server_1' | 'server_2' | 'youtube_url' | 'highlights_url'>('server_1');
+  const [activeServer, setActiveServer] = useState<
+    'server_1' | 'server_2' | 'youtube_url' | 'highlights_url'
+  >('server_1');
   const [currentStreams, setCurrentStreams] = useState<StreamLinks | null>(null);
   const [loadingStreams, setLoadingStreams] = useState(false);
 
@@ -223,7 +225,6 @@ export default function App() {
                   {selected.league}
                 </span>
               </div>
-
               <div className="flex items-center justify-between gap-4 sm:justify-around">
                 <div className="flex flex-col items-center gap-3 text-center">
                   <img
@@ -284,287 +285,361 @@ export default function App() {
 
                 <button
                   onClick={() => setActiveServer('server_2')}
-className={flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${ activeServer === 'server_2' ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25' : 'bg-slate-800 text-gray-300 hover:bg-slate-700' }}
->
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                    activeServer === 'server_2'
+                      ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25'
+                      : 'bg-slate-800 text-gray-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Play className="h-4 w-4" />
+                  سێرڤەری ٢
+                </button>
 
-سێرڤەری ٢
-<button
-onClick={() => setActiveServer('youtube_url')}
-className={flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${ activeServer === 'youtube_url' ? 'bg-red-500 text-white shadow-lg shadow-red-500/25' : 'bg-slate-800 text-gray-300 hover:bg-slate-700' }}
->
+                <button
+                  onClick={() => setActiveServer('youtube_url')}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                    activeServer === 'youtube_url'
+                      ? 'bg-red-500 text-white shadow-lg shadow-red-500/25'
+                      : 'bg-slate-800 text-gray-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Youtube className="h-4 w-4" />
+                  یوتیوب
+                </button>
 
-یوتیوب
-<button
-onClick={() => setActiveServer('highlights_url')}
-className={flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${ activeServer === 'highlights_url' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25' : 'bg-slate-800 text-gray-300 hover:bg-slate-700' }}
->
+                <button
+                  onClick={() => setActiveServer('highlights_url')}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                    activeServer === 'highlights_url'
+                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                      : 'bg-slate-800 text-gray-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Film className="h-4 w-4" />
+                  کورتەی یاری
+                </button>
+              </div>
 
-کورتەی یاری
+              <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-slate-950">
+                {loadingStreams ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+                    <p className="text-sm text-gray-400">چاوەڕوانبە، سێرڤەر باردەبێت...</p>
+                  </div>
+                ) : activeUrl ? (
+                  <iframe
+                    src={activeUrl}
+                    className="h-full w-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    title="Live Sport KRD Player"
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
+                      <Tv className="h-7 w-7" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white">
+                      لینکی ئەم سێرڤەرە هێشتا دانەنراوە
+                    </h3>
+                    <p className="max-w-md text-xs text-gray-400">
+                      کەمێک پێش دەستپێکردنی یارییەکە یان لە سێرڤەرەکانی ترەوە لینکەکە چالاک دەبێت.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : nav === 'admin' ? (
+          <div className="mx-auto max-w-3xl">
+            {!adminUnlocked ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400">
+                  <Lock className="h-7 w-7" />
+                </div>
+                <h2 className="text-xl font-extrabold">پانێڵی بەڕێوەبەری Live Sport KRD</h2>
+                <p className="mt-1 text-sm text-gray-400">
+                  وشەی نهێنی بنووسە بۆ دانان و دەستکاریکردنی لینکی یارییەکان
+                </p>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (adminPass === 'KRD2026@') {
+                      setAdminUnlocked(true);
+                      setAdminError('');
+                    } else {
+                      setAdminError('وشەی نهێنی هەڵەیە!');
+                    }
+                  }}
+                  className="mx-auto mt-6 max-w-xs space-y-3"
+                >
+                  <input
+                    type="password"
+                    value={adminPass}
+                    onChange={(e) => setAdminPass(e.target.value)}
+                    placeholder="وشەی نهێنی..."
+                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-center text-white focus:border-emerald-500 focus:outline-none"
+                  />
+                  {adminError && <p className="text-xs text-red-400">{adminError}</p>}
+                  <button
+                    type="submit"
+                    className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-extrabold text-slate-950 transition hover:bg-emerald-400"
+                  >
+                    چوونە ژوورەوە
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-6 rounded-2xl border border-white/10 bg-slate-900 p-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-6 w-6 text-emerald-400" />
+                    <h2 className="text-lg font-extrabold">بەڕێوەبردنی لینکی یارییەکان</h2>
+                  </div>
+                  <button
+                    onClick={() => setNav('today')}
+                    className="text-xs text-gray-400 hover:text-white"
+                  >
+                    گەڕانەوە بۆ ماڵپەڕ
+                  </button>
+                </div>
 
-{loadingStreams ? (
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-gray-300">
+                    ١. یارییەک هەڵبژێرە لە لیستی یارییەکانی ئەمڕۆ:
+                  </label>
+                  <select
+                    value={editingMatchId}
+                    onChange={(e) => handleSelectAdminMatch(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option value="">-- یارییەک دیاری بکە --</option>
+                    {matches.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.home.name} vs {m.away.name} ({m.league} - {m.kickoff})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
+                {editingMatchId && (
+                  <form onSubmit={handleSaveStreams} className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-emerald-400">
+                        لینکی سێرڤەری سەرەکی (Embed URL):
+                      </label>
+                      <input
+                        type="url"
+                        value={formLinks.server_1}
+                        onChange={(e) =>
+                          setFormLinks({ ...formLinks, server_1: e.target.value })
+                        }
+                        placeholder="https://..."
+                        dir="ltr"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
+                      />
+                    </div>
 
-چاوەڕوانبە، سێرڤەر باردەبێت...
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-emerald-400">
+                        لینکی سێرڤەری ٢ (Embed URL):
+                      </label>
+                      <input
+                        type="url"
+                        value={formLinks.server_2}
+                        onChange={(e) =>
+                          setFormLinks({ ...formLinks, server_2: e.target.value })
+                        }
+                        placeholder="https://..."
+                        dir="ltr"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
+                      />
+                    </div>
 
-) : activeUrl ? (
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-red-400">
+                        لینکی پەخشی فەرمی یوتیوب (YouTube URL):
+                      </label>
+                      <input
+                        type="url"
+                        value={formLinks.youtube_url}
+                        onChange={(e) =>
+                          setFormLinks({ ...formLinks, youtube_url: e.target.value })
+                        }
+                        placeholder="https://youtube.com..."
+                        dir="ltr"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
+                      />
+                    </div>
 
-) : (
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-amber-400">
+                        لینکی کورتەی یاری (Highlights YouTube URL):
+                      </label>
+                      <input
+                        type="url"
+                        value={formLinks.highlights_url}
+                        onChange={(e) =>
+                          setFormLinks({ ...formLinks, highlights_url: e.target.value })
+                        }
+                        placeholder="https://youtube.com..."
+                        dir="ltr"
+                        className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
+                      />
+                    </div>
 
+                    {saveSuccess && (
+                      <div className="flex items-center gap-2 rounded-xl bg-emerald-500/15 p-3 text-sm font-bold text-emerald-400">
+                        <CheckCircle2 className="h-5 w-5" />
+                        لینکەکان بە سەرکەوتوویی خەزن کران و ئێستا لای هەموو سەردانیکەران کاردەکەن!
+                      </div>
+                    )}
 
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3.5 text-sm font-extrabold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                    >
+                      <Save className="h-4 w-4" />
+                      {saving ? 'خەریکی خەزنکردنە...' : 'خەزنکردنی لینکەکان'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {nav === 'today' && (
+              <div className="mb-6 overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-l from-slate-850 via-slate-800/60 to-slate-850 p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 ring-1 ring-emerald-500/20">
+                        <Radio className="h-4 w-4 text-emerald-400" />
+                      </span>
+                      <span className="text-sm font-bold text-emerald-400">پەخشی زیندوو</span>
+                    </div>
+                    <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
+                      یارییەکانی ئەمڕۆ
+                    </h1>
+                    <p className="mt-1 text-sm text-gray-400">
+                      {liveCount > 0
+                        ? `${liveCount} یاری ڕاستەوخۆ ئێستا`
+                        : 'هەموو یارییەکان بەدوای دەرئەنجامی ڕاستەوخۆدا'}
+                    </p>
+                  </div>
+                  <div className="hidden shrink-0 sm:block">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20">
+                      <Calendar className="h-8 w-8 text-emerald-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
+            {(nav === 'today' || nav === 'live') && (
+              <div className="flex flex-col gap-6 lg:flex-row">
+                <div className="min-w-0 flex-1">
+                  <DayTabs
+                    active={day}
+                    onChange={setDay}
+                    onRefresh={() => loadMatches(day, true)}
+                    refreshing={loading}
+                  />
 
+                  {loading && matches.length === 0 && (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-slate-800/40 py-20">
+                      <Loader2 className="h-7 w-7 animate-spin text-emerald-400" />
+                      <p className="text-sm text-gray-400">چاوەڕوانبە، زانیارییەکان باردەبن...</p>
+                    </div>
+                  )}
 
-لینکی ئەم سێرڤەرە هێشتا دانەنراوە
+                  {error && (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/[0.03] py-16 text-center">
+                      <AlertCircle className="h-10 w-10 text-red-400" />
+                      <p className="text-sm text-red-300">{error}</p>
+                      <button
+                        onClick={() => loadMatches(day, true)}
+                        className="mt-1 rounded-lg bg-red-500/20 px-4 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/30"
+                      >
+                        هەوڵبدانەوە
+                      </button>
+                    </div>
+                  )}
 
+                  {!loading && !error && displayMatches.length > 0 && (
+                    <div className="space-y-1">
+                      {leagueGroups.map((group) => (
+                        <div key={group.leagueId} className="animate-fadeIn">
+                          <LeagueHeader group={group} />
+                          <div className="space-y-1.5">
+                            {group.matches.map((m) => (
+                              <MatchCard
+                                key={m.id}
+                                match={m}
+                                onClick={() => handleOpenMatch(m)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-کەمێک پێش دەستپێکردنی یارییەکە یان لە سێرڤەرەکانی ترەوە لینکەکە چالاک دەبێت.
+                  {!loading && !error && displayMatches.length === 0 && (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-slate-800/40 py-16 text-center">
+                      <Info className="h-10 w-10 text-gray-600" />
+                      <p className="text-gray-400">هیچ یارییەک لەم ڕۆژەدا بەردەست نییە</p>
+                    </div>
+                  )}
+                </div>
 
+                <div className="shrink-0 lg:w-80">
+                  <Sidebar
+                    matches={matches}
+                    onMatchClick={handleOpenMatch}
+                    onLeagueClick={() => setNav('leagues')}
+                  />
+                </div>
+              </div>
+            )}
 
-)}
+            {nav === 'leagues' && <LeaguesView />}
+            {nav === 'news' && <NewsView />}
+          </>
+        )}
+      </main>
 
-
-
-) : nav === 'admin' ? (
-
-{!adminUnlocked ? (
-
-
-
-
-پانێڵی بەڕێوەبەری Live Sport KRD
-
-وشەی نهێنی بنووسە بۆ دانان و دەستکاریکردنی لینکی یارییەکان
-
-<form
-onSubmit={(e) => {
-e.preventDefault();
-if (adminPass === 'KRD2026@') {
-setAdminUnlocked(true);
-setAdminError('');
-} else {
-setAdminError('وشەی نهێنی هەڵەیە!');
+      <footer className="mt-8 border-t border-white/[0.06] py-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600">
+                <Activity className="h-4 w-4 text-slate-950" strokeWidth={2.8} />
+              </div>
+              <div className="text-right">
+                <span className="block text-sm font-extrabold text-white">Live Sport KRD</span>
+                <span className="block text-[10px] text-emerald-400">پەخشی زیندووی وەرزشی</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <p className="text-center text-xs text-gray-500">
+                داتا لە API-Sports وەرگیراوە • کاتی ناوچەی بەغدا
+              </p>
+              <button
+                onClick={() => {
+                  setSelected(null);
+                  setNav('admin');
+                }}
+                className="text-xs text-gray-600 transition hover:text-emerald-400"
+              >
+                بەڕێوەبردن
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
 }
-}}
-className="mx-auto mt-6 max-w-xs space-y-3"
->
-<input
-type="password"
-value={adminPass}
-onChange={(e) => setAdminPass(e.target.value)}
-placeholder="وشەی نهێنی..."
-className="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-center text-white focus:border-emerald-500 focus:outline-none"
-/>
-{adminError && {adminError}}
-
-چوونە ژوورەوە
-
-
-
-) : (
-
-
-
-
-بەڕێوەبردنی لینکی یارییەکان
-
-<button
-onClick={() => setNav('today')}
-className="text-xs text-gray-400 hover:text-white"
->
-گەڕانەوە بۆ ماڵپەڕ
-
-١. یارییەک هەڵبژێرە لە لیستی یارییەکانی ئەمڕۆ:
-<select
-value={editingMatchId}
-onChange={(e) => handleSelectAdminMatch(e.target.value)}
-className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white focus:border-emerald-500 focus:outline-none"
->
--- یارییەک دیاری بکە --
-{matches.map((m) => (
-
-{m.home.name} vs {m.away.name} ({m.league} - {m.kickoff})
-
-))}
-
-{editingMatchId && (
-
-لینکی سێرڤەری سەرەکی (Embed URL):
-<input
-type="url"
-value={formLinks.server_1}
-onChange={(e) =>
-setFormLinks({ ...formLinks, server_1: e.target.value })
-}
-placeholder="https://..."
-dir="ltr"
-className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
-/>
-لینکی سێرڤەری ٢ (Embed URL):
-<input
-type="url"
-value={formLinks.server_2}
-onChange={(e) =>
-setFormLinks({ ...formLinks, server_2: e.target.value })
-}
-placeholder="https://..."
-dir="ltr"
-className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
-/>
-لینکی پەخشی فەرمی یوتیوب (YouTube URL):
-<input
-type="url"
-value={formLinks.youtube_url}
-onChange={(e) =>
-setFormLinks({ ...formLinks, youtube_url: e.target.value })
-}
-placeholder="youtube.com..."
-dir="ltr"
-className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
-/>
-لینکی کورتەی یاری (Highlights YouTube URL):
-<input
-type="url"
-value={formLinks.highlights_url}
-onChange={(e) =>
-setFormLinks({ ...formLinks, highlights_url: e.target.value })
-}
-placeholder="youtube.com..."
-dir="ltr"
-className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm text-white"
-/>
-{saveSuccess && (
-
-
-لینکەکان بە سەرکەوتوویی خەزن کران و ئێستا لای هەموو سەردانیکەران کاردەکەن!
-
-)}
-{saving ? 'خەریکی خەزنکردنە...' : 'خەزنکردنی لینکەکان'}
-
-
-)}
-
-)}
-
-) : (
-<>
-{nav === 'today' && (
-
-
-
-
-
-
-
-پەخشی زیندوو
-
-
-یارییەکانی ئەمڕۆ
-
-
-{liveCount > 0
-? ${liveCount} یاری ڕاستەوخۆ ئێستا
-: 'هەموو یارییەکان بەدوای دەرئەنجامی ڕاستەوخۆدا'}
-
-
-
-
-
-
-
-
-
-)}
-{(nav === 'today' || nav === 'live') && (
-
-
-<DayTabs
-active={day}
-onChange={setDay}
-onRefresh={() => loadMatches(day, true)}
-refreshing={loading}
-/>
-{loading && matches.length === 0 && (
-
-
-چاوەڕوانبە، زانیارییەکان باردەبن...
-
-)}
-{error && (
-
-
-{error}
-<button
-onClick={() => loadMatches(day, true)}
-className="mt-1 rounded-lg bg-red-500/20 px-4 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/30"
->
-هەوڵبدانەوە
-
-
-)}
-{!loading && !error && displayMatches.length > 0 && (
-
-{leagueGroups.map((group) => (
-
-
-
-{group.matches.map((m) => (
-<MatchCard
-key={m.id}
-match={m}
-onClick={() => handleOpenMatch(m)}
-/>
-))}
-
-
-))}
-
-)}
-{!loading && !error && displayMatches.length === 0 && (
-
-
-هیچ یارییەک لەم ڕۆژەدا بەردەست نییە
-
-)}
-<Sidebar
-matches={matches}
-onMatchClick={handleOpenMatch}
-onLeagueClick={() => setNav('leagues')}
-/>
-
-
-)}
-{nav === 'leagues' && }
-{nav === 'news' && }
-</>
-)}
-Live Sport KRD
-پەخشی زیندووی وەرزشی
-
-
-
-
-داتا لە API-Sports وەرگیراوە • کاتی ناوچەی بەغدا
-
-<button
-onClick={() => {
-setSelected(null);
-setNav('admin');
-}}
-className="text-xs text-gray-600 transition hover:text-emerald-400"
->
-بەڕێوەبردن
-
-
-
-
-
-
-);
-}
-
-4. کلیک لە دوگمە سەوزەکەی **`Commit changes`** بکە لە GitHub.
-5. ٣٠ چرکە چاوەڕێ بکە؛ لە Vercel نیشانەکە دەبێتە سەوز (**Ready**)، و کاتێک دەچیتە سەر `livesportkrd.vercel.app`، دەتوانیت بچیتە خوارەوەی پەڕەکە و کلیک لە **`بەڕێوەبردن`** بکەیت.
-
-<FollowUp>
-ئەم کۆدە چاککراوە بخەرە ناو `src/App.tsx` و **Commit changes** دابگرە؛ پێم بڵێ دوای ٣٠ چرکە کاتێک **Ready** بوو و پەڕەی بینینی یاریت تاقی کردەوە!
-</FollowUp>
