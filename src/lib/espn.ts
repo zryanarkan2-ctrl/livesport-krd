@@ -248,23 +248,37 @@ export async function getMatches(
     if (cached) return cached;
   }
 
-  // ESPN ڕۆژەکان بە کاتی ئەمریکا دابەش دەکات، بۆیە ڕۆژی پێش و دوای ئەویش دەهێنین
-  // و دواتر بە کاتی بەغدا فلتەریان دەکەین. ئەمە یاری نیوەشەو لە دەست نادات.
-  const range = `${shiftDate(target, -1)}-${shiftDate(target, 1)}`;
+  // ESPN ڕۆژەکان بە کاتی ئەمریکا دابەش دەکات، بۆیە ڕۆژی پێشووش دەهێنین و دواتر
+  // بە کاتی بەغدا فلتەریان دەکەین. ئەمە یاری نیوەشەو لە دەست نادات.
+  // (هەر ڕۆژێک بە جیا دەهێنین، چونکە ESPN داواکاری بە ماوە dates=A-B و limit بۆ تۆپی پێ
+  //  قبووڵ ناکات و هەڵەی 400 دەدات.)
+  const days = [shiftDate(target, -1), target];
   const byId = new Map<string, MatchX>();
   const seenLogos: Record<number, string> = {};
   let failed = 0;
+  let partial = false;
 
   await Promise.all(
     LEAGUES.map(async (lg) => {
       try {
-        const data = await espnFetch(`${SITE_PATH}${lg.slug}/scoreboard?dates=${range}&limit=300`);
-        const leagueLogo: string = data.leagues?.[0]?.logos?.[0]?.href || '';
-        if (leagueLogo) seenLogos[lg.id] = leagueLogo;
-        for (const ev of data.events || []) {
-          if (baghdadDateStr(new Date(ev.date).getTime()) !== target) continue;
-          const m = mapEvent(ev, lg, leagueLogo, day);
-          if (m) byId.set(`${lg.id}-${m.id}`, m);
+        const settled = await Promise.allSettled(
+          days.map((d) => espnFetch(`${SITE_PATH}${lg.slug}/scoreboard?dates=${d}`)),
+        );
+        if (settled.every((r) => r.status === 'rejected')) {
+          throw (settled[0] as PromiseRejectedResult).reason;
+        }
+        if (settled.some((r) => r.status === 'rejected')) partial = true;
+
+        for (const r of settled) {
+          if (r.status !== 'fulfilled') continue;
+          const data = r.value;
+          const leagueLogo: string = data.leagues?.[0]?.logos?.[0]?.href || '';
+          if (leagueLogo) seenLogos[lg.id] = leagueLogo;
+          for (const ev of data.events || []) {
+            if (baghdadDateStr(new Date(ev.date).getTime()) !== target) continue;
+            const m = mapEvent(ev, lg, leagueLogo, day);
+            if (m) byId.set(`${lg.id}-${m.id}`, m);
+          }
         }
       } catch (err) {
         failed += 1;
@@ -282,8 +296,8 @@ export async function getMatches(
     (a.startTime || '').localeCompare(b.startTime || ''),
   );
 
-  // تەنها ئەگەر هیچ لیگێک شکستی نەهێنابێت کاش بکە
-  if (failed === 0) writeCache(target, matches);
+  // تەنها ئەگەر هیچ داواکارییەک شکستی نەهێنابێت کاش بکە
+  if (failed === 0 && !partial) writeCache(target, matches);
   return matches;
 }
 
