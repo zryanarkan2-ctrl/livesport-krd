@@ -1,21 +1,18 @@
-import { Trophy, Calendar, Newspaper, Radio, Search, Menu, X, Activity } from 'lucide-react';
+import { Trophy, Calendar, Radio, Search, Menu, X, Activity } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
   active: string;
   onNav: (item: string) => void;
-  query?: string;
-  onQuery?: (q: string) => void;
 }
 
 const navItems = [
   { id: 'today', label: 'یارییەکانی ئەمڕۆ', icon: Calendar },
   { id: 'leagues', label: 'خولەکان', icon: Trophy },
-  { id: 'news', label: 'هەواڵەکان', icon: Newspaper },
   { id: 'live', label: 'پەخشی ڕاستەوخۆ', icon: Radio },
 ];
 
-export function Header({ active, onNav, query = '', onQuery }: Props) {
+export function Header({ active, onNav }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -63,15 +60,10 @@ export function Header({ active, onNav, query = '', onQuery }: Props) {
 
         {/* Right actions */}
         <div className="flex items-center gap-2">
-          <label className="hidden items-center gap-2 rounded-lg border border-white/[0.06] bg-slate-800/50 px-3 py-2 text-sm text-gray-500 focus-within:border-emerald-500/40 sm:flex">
+          <div className="hidden items-center gap-2 rounded-lg border border-white/[0.06] bg-slate-800/50 px-3 py-2 text-sm text-gray-500 sm:flex">
             <Search className="h-4 w-4" />
-            <input
-              value={query}
-              onChange={(e) => onQuery?.(e.target.value)}
-              placeholder="گەڕان بەدوای یانە یان خول..."
-              className="w-44 bg-transparent text-xs text-white outline-none placeholder:text-gray-500"
-            />
-          </label>
+            <span className="text-xs">گەڕان بەدوای یانە یان خول...</span>
+          </div>
           <button
             onClick={() => setOpen(!open)}
             className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white transition-colors hover:bg-white/10 md:hidden"
