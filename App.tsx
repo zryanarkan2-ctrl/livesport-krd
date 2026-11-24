@@ -6,7 +6,6 @@ import { MatchModal } from '@/components/MatchModal';
 import { LeagueHeader } from '@/components/LeagueHeader';
 import { Sidebar } from '@/components/Sidebar';
 import { LeaguesView } from '@/components/LeaguesView';
-import { NewsView } from '@/components/NewsView';
 import { getMatches, groupByLeague, clearCache } from '@/api';
 import type { Match } from '@/types';
 import { Radio, Calendar, Info, Loader2, AlertCircle, Activity } from 'lucide-react';
@@ -157,7 +156,6 @@ export default function App() {
         )}
 
         {nav === 'leagues' && <LeaguesView />}
-        {nav === 'news' && <NewsView />}
       </main>
 
       {/* Footer */}
