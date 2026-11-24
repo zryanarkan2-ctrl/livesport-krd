@@ -4,6 +4,8 @@ import { useState } from 'react';
 interface Props {
   active: string;
   onNav: (item: string) => void;
+  query?: string;
+  onQuery?: (q: string) => void;
 }
 
 const navItems = [
@@ -12,7 +14,7 @@ const navItems = [
   { id: 'live', label: 'پەخشی ڕاستەوخۆ', icon: Radio },
 ];
 
-export function Header({ active, onNav }: Props) {
+export function Header({ active, onNav, query = '', onQuery }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -60,10 +62,15 @@ export function Header({ active, onNav }: Props) {
 
         {/* Right actions */}
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 rounded-lg border border-white/[0.06] bg-slate-800/50 px-3 py-2 text-sm text-gray-500 sm:flex">
+          <label className="hidden items-center gap-2 rounded-lg border border-white/[0.06] bg-slate-800/50 px-3 py-2 text-sm text-gray-500 focus-within:border-emerald-500/40 sm:flex">
             <Search className="h-4 w-4" />
-            <span className="text-xs">گەڕان بەدوای یانە یان خول...</span>
-          </div>
+            <input
+              value={query}
+              onChange={(e) => onQuery?.(e.target.value)}
+              placeholder="گەڕان بەدوای یانە یان خول..."
+              className="w-44 bg-transparent text-xs text-white outline-none placeholder:text-gray-500"
+            />
+          </label>
           <button
             onClick={() => setOpen(!open)}
             className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white transition-colors hover:bg-white/10 md:hidden"
