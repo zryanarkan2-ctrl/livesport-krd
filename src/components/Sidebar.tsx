@@ -1,5 +1,6 @@
 import type { Match } from '@/types';
 import { TeamLogo } from './TeamLogo';
+import { LEAGUES, getLeagueLogos } from '@/lib/espn';
 import { Trophy, Radio, MapPin, Flame } from 'lucide-react';
 
 interface Props {
@@ -8,19 +9,9 @@ interface Props {
   onLeagueClick: () => void;
 }
 
-const TOP_LEAGUES = [
-  { id: 39, name: 'Premier League', logo: 'https://media.api-sports.io/football/leagues/39.png' },
-  { id: 140, name: 'La Liga', logo: 'https://media.api-sports.io/football/leagues/140.png' },
-  { id: 71, name: 'Serie A', logo: 'https://media.api-sports.io/football/leagues/71.png' },
-  { id: 78, name: 'Bundesliga', logo: 'https://media.api-sports.io/football/leagues/78.png' },
-  { id: 61, name: 'Ligue 1', logo: 'https://media.api-sports.io/football/leagues/61.png' },
-  { id: 2, name: 'Champions League', logo: 'https://media.api-sports.io/football/leagues/2.png' },
-  { id: 203, name: 'Saudi Pro League', logo: 'https://media.api-sports.io/football/leagues/203.png' },
-  { id: 250, name: 'Süper Lig', logo: 'https://media.api-sports.io/football/leagues/250.png' },
-];
-
 export function Sidebar({ matches, onMatchClick, onLeagueClick }: Props) {
   const liveMatch = matches.find((m) => m.status === 'live') ?? null;
+  const logos = getLeagueLogos();
 
   return (
     <aside className="flex flex-col gap-4">
@@ -36,7 +27,7 @@ export function Sidebar({ matches, onMatchClick, onLeagueClick }: Props) {
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
               <span className="text-[11px] font-bold text-emerald-400">
-                {liveMatch.minute}'
+                {liveMatch.minute != null ? `${liveMatch.minute}'` : liveMatch.statusShort}
               </span>
             </span>
           </div>
@@ -93,21 +84,25 @@ export function Sidebar({ matches, onMatchClick, onLeagueClick }: Props) {
           <span className="text-sm font-bold text-white">خولە سەرەکییەکان</span>
         </div>
         <div className="p-2">
-          {TOP_LEAGUES.map((l) => (
+          {LEAGUES.map((l) => (
             <button
               key={l.id}
               onClick={onLeagueClick}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-right transition-colors hover:bg-white/5"
             >
-              <img
-                src={l.logo}
-                alt=""
-                loading="lazy"
-                className="h-6 w-6 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              {logos[l.id] ? (
+                <img
+                  src={logos[l.id]}
+                  alt=""
+                  loading="lazy"
+                  className="h-6 w-6 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <Trophy className="h-6 w-6 p-1 text-gray-600" />
+              )}
               <span className="text-sm font-medium text-gray-300 hover:text-white">
                 {l.name}
               </span>

@@ -47,7 +47,7 @@ export interface Match {
   stats?: MatchStats;
   homeLineup?: Lineup;
   awayLineup?: Lineup;
-  day: 'yesterday' | 'today' | 'tomorrow';
+  day: string;
 }
 
 export interface ApiMatch {

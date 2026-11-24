@@ -1,60 +1,79 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/Header';
 import { DayTabs } from '@/components/DayTabs';
 import { MatchCard } from '@/components/MatchCard';
-import { MatchModal } from '@/components/MatchModal';
+import { MatchDetailsModal } from '@/components/MatchDetailsModal';
+import { EmptyDay } from '@/components/EmptyDay';
 import { LeagueHeader } from '@/components/LeagueHeader';
 import { Sidebar } from '@/components/Sidebar';
 import { LeaguesView } from '@/components/LeaguesView';
 import { NewsView } from '@/components/NewsView';
-import { getMatches, groupByLeague, clearCache } from '@/api';
-import type { Match } from '@/types';
-import { Radio, Calendar, Info, Loader2, AlertCircle, Activity } from 'lucide-react';
-
-type Day = 'yesterday' | 'today' | 'tomorrow';
+import { filterMatches, groupByLeague } from '@/api';
+import { useMatches } from '@/hooks/useMatches';
+import { useFavorites } from '@/lib/favorites';
+import { restoreReminders } from '@/lib/reminders';
+import type { DayKey, MatchX } from '@/lib/espn-types';
+import { Radio, Calendar, Loader2, AlertCircle, Activity, Search } from 'lucide-react';
 
 export default function App() {
   const [nav, setNav] = useState('today');
-  const [day, setDay] = useState<Day>('today');
-  const [selected, setSelected] = useState<Match | null>(null);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [day, setDay] = useState<string>('today');
+  const [selected, setSelected] = useState<MatchX | null>(null);
+  const [query, setQuery] = useState('');
+  const [favOnly, setFavOnly] = useState(false);
 
-  const loadMatches = useCallback(
-    (targetDay: Day, force = false) => {
-      if (force) clearCache(targetDay);
-      setLoading(true);
-      setError(null);
-      getMatches(targetDay)
-        .then((data) => setMatches(data))
-        .catch((err) => setError(err.message || 'هەڵەیەک ڕوویدا'))
-        .finally(() => setLoading(false));
-    },
-    [],
-  );
+  const { favs } = useFavorites();
 
+  // "پەخشی ڕاستەوخۆ" لە مینیوەکە = تابی ڕاستەوخۆ
+  const feedActive = nav === 'today' || nav === 'live';
+  const effectiveDay: DayKey = nav === 'live' ? 'live' : day;
+  const { matches, loading, error, refresh } = useMatches(effectiveDay, feedActive);
+
+  // بیرهێنەرەوە پاشەکەوتکراوەکان دووبارە چالاک بکەرەوە
   useEffect(() => {
-    if (nav !== 'today' && nav !== 'live') return;
-    loadMatches(day);
-  }, [day, nav, loadMatches]);
+    restoreReminders();
+  }, []);
 
   const liveCount = useMemo(
-    () => matches.filter((m) => m.status === 'live').length,
-    [matches],
+    () =>
+      effectiveDay === 'today' || effectiveDay === 'live'
+        ? matches.filter((m) => m.status === 'live').length
+        : 0,
+    [matches, effectiveDay],
   );
 
-  const displayMatches =
-    nav === 'live' ? matches.filter((m) => m.status === 'live') : matches;
+  const displayMatches = useMemo(() => {
+    let list = filterMatches(matches, query);
+    if (favOnly) {
+      list = list.filter(
+        (m) => favs.teams.includes(m.home.id) || favs.teams.includes(m.away.id),
+      );
+    }
+    return list;
+  }, [matches, query, favOnly, favs]);
 
   const leagueGroups = useMemo(
     () => groupByLeague(displayMatches),
     [displayMatches],
   );
 
+  const handleDayChange = (d: DayKey) => {
+    if (d === 'live') {
+      setNav('live');
+    } else {
+      setDay(d);
+      setNav('today');
+    }
+  };
+
+  const handleQuery = (q: string) => {
+    setQuery(q);
+    if (!feedActive) setNav('today');
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <Header active={nav} onNav={setNav} />
+      <Header active={nav} onNav={setNav} query={query} onQuery={handleQuery} />
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {/* Hero banner — only on today */}
@@ -87,15 +106,29 @@ export default function App() {
         )}
 
         {/* Matches section with 2-column layout */}
-        {(nav === 'today' || nav === 'live') && (
+        {feedActive && (
           <div className="flex flex-col gap-6 lg:flex-row">
             {/* Main feed */}
             <div className="min-w-0 flex-1">
+              {/* گەڕان بۆ مۆبایل (لە مینیوی سەرەوە تەنها لە شاشەی گەورە دیارە) */}
+              <label className="mb-3 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-slate-800/40 px-3 py-2.5 text-gray-500 focus-within:border-emerald-500/40 sm:hidden">
+                <Search className="h-4 w-4" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="گەڕان بەدوای یانە یان خول..."
+                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-500"
+                />
+              </label>
+
               <DayTabs
-                active={day}
-                onChange={setDay}
-                onRefresh={() => loadMatches(day, true)}
+                value={nav === 'live' ? 'live' : day}
+                onChange={handleDayChange}
+                liveCount={liveCount}
+                onRefresh={refresh}
                 refreshing={loading}
+                favOnly={favOnly}
+                onToggleFav={() => setFavOnly((v) => !v)}
               />
 
               {loading && matches.length === 0 && (
@@ -108,9 +141,9 @@ export default function App() {
               {error && (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/[0.03] py-16 text-center">
                   <AlertCircle className="h-10 w-10 text-red-400" />
-                  <p className="text-sm text-red-300">{error}</p>
+                  <p className="text-sm text-red-300">نەتوانرا یارییەکان بهێنرێن، تۆڕەکەت بپشکنە</p>
                   <button
-                    onClick={() => loadMatches(day, true)}
+                    onClick={refresh}
                     className="mt-1 rounded-lg bg-red-500/20 px-4 py-2 text-xs font-bold text-red-300 transition-colors hover:bg-red-500/30"
                   >
                     هەوڵبدانەوە
@@ -138,10 +171,14 @@ export default function App() {
               )}
 
               {!loading && !error && displayMatches.length === 0 && (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.06] bg-slate-800/40 py-16 text-center">
-                  <Info className="h-10 w-10 text-gray-600" />
-                  <p className="text-gray-400">هیچ یارییەک لەم ڕۆژەدا بەردەست نییە</p>
-                </div>
+                <EmptyDay
+                  day={effectiveDay}
+                  hasSearch={Boolean(query) || favOnly}
+                  onGoToday={() => {
+                    setDay('today');
+                    setNav('today');
+                  }}
+                />
               )}
             </div>
 
@@ -174,15 +211,13 @@ export default function App() {
               </div>
             </div>
             <p className="text-center text-xs text-gray-500">
-              داتا لە API-Sports وەرگیراوە • کاتی ناوچەی بەغدا
+              داتا لە ESPN وەرگیراوە • کاتی ناوچەی بەغدا
             </p>
           </div>
         </div>
       </footer>
 
-      {selected && (
-        <MatchModal match={selected} onClose={() => setSelected(null)} />
-      )}
+      <MatchDetailsModal match={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
