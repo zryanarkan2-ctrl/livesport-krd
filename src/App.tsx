@@ -7,7 +7,6 @@ import { EmptyDay } from '@/components/EmptyDay';
 import { LeagueHeader } from '@/components/LeagueHeader';
 import { Sidebar } from '@/components/Sidebar';
 import { LeaguesView } from '@/components/LeaguesView';
-import { NewsView } from '@/components/NewsView';
 import { filterMatches, groupByLeague } from '@/api';
 import { useMatches } from '@/hooks/useMatches';
 import { useFavorites } from '@/lib/favorites';
@@ -194,7 +193,6 @@ export default function App() {
         )}
 
         {nav === 'leagues' && <LeaguesView />}
-        {nav === 'news' && <NewsView />}
       </main>
 
       {/* Footer */}
