@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Share2, X } from 'lucide-react';
 import { getMatchDetails } from '@/lib/espn';
+import { WatchButtons } from './WatchButtons';
+import { useWatchLinks } from '@/lib/watchLinks';
 import type { MatchDetails, MatchEvent, MatchX, TeamLineup } from '@/lib/espn-types';
 
 interface Props {
@@ -127,6 +129,7 @@ export function MatchDetailsModal({ match, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const watchLinks = useWatchLinks();
 
   const matchId = match?.id;
   const slug = match?.leagueSlug;
@@ -264,6 +267,8 @@ export function MatchDetailsModal({ match, onClose }: Props) {
             </p>
           )}
         </div>
+
+        <WatchButtons links={(match.id && watchLinks[match.id]) || []} />
 
         {/* تابەکان */}
         <div className="flex gap-1 border-b border-white/[0.06] px-4 pt-2">

@@ -2,7 +2,8 @@ import type { MatchX } from '@/lib/espn-types';
 import { TeamLogo } from './TeamLogo';
 import { ReminderBell, TeamStar } from './MatchActions';
 import { formatKickoff } from '@/api';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Play } from 'lucide-react';
+import { useWatchLinks } from '@/lib/watchLinks';
 
 interface Props {
   match: MatchX;
@@ -13,6 +14,7 @@ interface Props {
 const CALLED_OFF = ['دواخرا', 'هەڵوەشایەوە', 'ڕاگیرا', 'دواکەوت'];
 
 export function MatchCard({ match, onClick }: Props) {
+  const hasWatch = (useWatchLinks()[match.id]?.length ?? 0) > 0;
   const hasScore =
     (match.status === 'live' || match.status === 'finished') &&
     match.scoreHome != null &&
@@ -121,6 +123,13 @@ export function MatchCard({ match, onClick }: Props) {
           <TeamStar teamId={match.away.id} size="h-3.5 w-3.5" />
         </div>
       </div>
+
+      {hasWatch && (
+        <span className="flex shrink-0 items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-1 text-[11px] font-bold text-emerald-400 ring-1 ring-emerald-500/30">
+          <Play className="h-3 w-3" />
+          <span className="hidden sm:inline">بینین</span>
+        </span>
+      )}
 
       <ReminderBell match={match} />
 
